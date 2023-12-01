@@ -95,6 +95,22 @@ public:
         check_fitted();
         return m_evidence_values;
     }
+    VectorXd probabilities() const {
+        check_fitted();
+        VectorXd prob(m_logprob.size());
+        for (int i = 0; i < prob.size(); ++i) {
+            prob[i] = std::exp(m_logprob(i));  
+        }
+        return prob;
+    }
+    const VectorXi cardinality() const {
+        check_fitted();
+        return m_cardinality;
+    }
+    const std::vector<std::vector<std::string>> parent_values() const {
+        check_fitted();
+        return m_evidence_values;
+    }
     bool fitted() const override { return m_fitted; }
     void fit(const DataFrame& df) override;
     VectorXd logl(const DataFrame& df) const override;
@@ -156,7 +172,7 @@ Array_ptr DiscreteFactor::sample_indices(int n, const DataFrame& evidence_values
     }
 
     std::mt19937 rng{seed};
-    std::uniform_int_distribution<> uniform(0, 1);
+    std::uniform_real_distribution<> uniform(0, 1);
 
     using CType = typename ArrowType::c_type;
     arrow::NumericBuilder<ArrowType> builder;
