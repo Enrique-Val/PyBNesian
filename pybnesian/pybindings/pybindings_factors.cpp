@@ -658,7 +658,11 @@ Initializes a new :class:`DiscreteFactor` with a given ``variable`` and ``eviden
 :param evidence: List of evidence variable names.
 )doc")
         .def(py::pickle([](const DiscreteFactor& self) { return self.__getstate__(); },
-                        [](py::tuple t) { return DiscreteFactor::__setstate__(t); }));
+                        [](py::tuple t) { return DiscreteFactor::__setstate__(t); }))
+        .def("variable_values", &DiscreteFactor::variable_values, "Returning values")
+        .def("probabilities", &DiscreteFactor::probabilities, "Returning probabilities")
+        .def("cardinality", &DiscreteFactor::cardinality, "Returns the shape of the CPT")
+        .def("parent_values", &DiscreteFactor::parent_values, "Returns the possible value assignments of the parents");
 
     py::class_<Assignment>(root, "Assignment", R"doc(
 :class:`Assignment <pybnesian.Assignment>` represents the assignment of values to a set of variables.
