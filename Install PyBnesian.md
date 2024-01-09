@@ -1,5 +1,5 @@
-# Installing PyBnesian (Enrique Valero-Leal)
-This is a more extensive guide on how to install PyBnesian on an Ubuntu computer and minimise error in the installation. If any error is detected throughout it, please contact [Enrique-Val](https://github.com/Enrique-Val) on GitHub and we will try to publish a new version addressing it.
+# Installing PyBnesian (Enrique Valero-Leal and Carlos Li Hu)
+This is a more extensive guide on how to install PyBNesian on an Ubuntu computer and minimise error in the installation. If any error is detected throughout it, please contact [Enrique-Val](https://github.com/Enrique-Val) on GitHub and we will try to publish a new version addressing it.
 
 
 ## Requirements of the Ubuntu computer for instaling PyBnesian
@@ -7,7 +7,7 @@ Before diving into installing Python packages, we need to ensure that certain C+
 
 	sudo apt install cmake
 	sudo apt install g++
-	sudo apt install opencl-headers 
+	sudo apt install opencl-headers
 	sudo apt install ocl-icd-opencl-dev
 	
 
@@ -38,22 +38,29 @@ Run the command:
 ### Option 2: Installing pybnesian from source
 First of all, clone the PyBnesian repo into your computer running the command:
 
-	clone https://github.com/davenza/PyBNesian 
+	git clone https://github.com/davenza/PyBNesian
 	
 For the latest ongoing dev changes, you might consider alternatively cloning Enrique-Val's PyBnesian fork:
 
-	https://github.com/Enrique-Val/PyBNesian
+	git clone https://github.com/Enrique-Val/PyBNesian
 	
 Enter into the newly created folder and run the installation file.
 	
 	cd PyBnesian
 	python setup.py install
 
+If you want to make changes to the library, you can do so by cleaning and recompiling it running the following commands:
+	python setup.py clean --all
+	python setup.py install
+
+Additionally, to accelerate the building process, you may use ccache. 
+- To install it, run the following command:
+	sudo apt install ccache
+- To use it, run the following command:
+	export CC="ccache gcc"
 
 ## Install pandas
 A bug prevents PyBnesian from being imported if pandas is not installed and imported previously. As such make sure to install pandas running the following command and to import it in your project before importing PyBnesian.
-
-	pip install pandas
 
 
 ## Useful links
