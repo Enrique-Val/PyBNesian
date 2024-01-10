@@ -5,6 +5,14 @@ namespace kde {
 
 class ScottsBandwidth : public BandwidthSelector {
 public:
+    /**
+     * @brief Public function for calculating the diagonal bandwidth matrix using Scott's Rule given the data and
+     * variables.
+     *
+     * @param df Dataframe.
+     * @param variables Variables.
+     * @return VectorXd Diagonal bandwidth vector.
+     */
     VectorXd diag_bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const override {
         if (variables.empty()) return VectorXd(0);
 
@@ -29,7 +37,13 @@ public:
                 throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
         }
     }
-
+    /**
+     * @brief Public function for calculating the bandwidth matrix using Scott's Rule given the data and variables.
+     *
+     * @param df Data
+     * @param variables Variables.
+     * @return MatrixXd Bandwidth matrix.
+     */
     MatrixXd bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const override {
         if (variables.empty()) return MatrixXd(0, 0);
 
@@ -62,6 +76,15 @@ public:
     static std::shared_ptr<ScottsBandwidth> __setstate__(py::tuple&) { return std::make_shared<ScottsBandwidth>(); }
 
 private:
+    /**
+     * @brief Private function for calculating the diagonal bandwidth matrix using Scott's Rule given the data and
+     * variables
+     *
+     * @tparam ArrowType Arrow Data type.
+     * @param df Dataframe.
+     * @param variables Variables.
+     * @return VectorXd Diagonal bandwidth vector.
+     */
     template <typename ArrowType>
     VectorXd diag_bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const {
         using CType = typename ArrowType::c_type;
@@ -86,7 +109,14 @@ private:
 
         return bandwidth;
     }
-
+    /**
+     * @brief Private function for calculating the bandwidth matrix using Scott's Rule given the data and variables.
+     *
+     * @tparam ArrowType Arrow Data type.
+     * @param df Dataframe.
+     * @param variables Variables.
+     * @return MatrixXd Bandwidth matrix.
+     */
     template <typename ArrowType>
     MatrixXd bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const {
         using CType = typename ArrowType::c_type;
@@ -100,12 +130,14 @@ private:
                 ss << ", " << variables[i];
             }
             ss << "] is not positive-definite.";
+
             throw util::singular_covariance_data(ss.str());
         }
 
         auto N = static_cast<CType>(df.valid_rows(variables));
         auto d = static_cast<CType>(variables.size());
 
+        // Scott's Rule formula
         auto k = std::pow(N, -2. / (d + 4));
 
         if constexpr (std::is_same_v<ArrowType, arrow::DoubleType>) {
