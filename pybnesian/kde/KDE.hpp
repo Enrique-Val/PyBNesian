@@ -26,6 +26,7 @@ struct UnivariateKDE {
                                  const typename ArrowType::c_type lognorm_const,
                                  cl::Buffer&,
                                  cl::Buffer& output_mat);
+
     template <typename ArrowType>
     static void execute_conditional_means(const cl::Buffer& joint_training,
                                           const cl::Buffer&,
@@ -40,6 +41,21 @@ struct UnivariateKDE {
                                           cl::Buffer& output_mat);
 };
 
+/**
+ * @brief Executes the log-likelihood calculation for a univariate KDE model.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @param training_vec Training data.
+ * @param training_length Number of training instances.
+ * @param test_vec Test data.
+ * @param int Unused.
+ * @param test_offset
+ * @param test_length Number of test instances.
+ * @param int Unused.
+ * @param cholesky Cholesky decomposition of the bandwidth matrix.
+ * @param lognorm_const log-likelihood constant.
+ * @param output_mat
+ */
 template <typename ArrowType>
 void UnivariateKDE::execute_logl_mat(const cl::Buffer& training_vec,
                                      const unsigned int training_length,
@@ -61,11 +77,14 @@ void UnivariateKDE::execute_logl_mat(const cl::Buffer& training_vec,
     k_logl_values_1d_mat.setArg(4, cholesky);
     k_logl_values_1d_mat.setArg(5, lognorm_const);
     k_logl_values_1d_mat.setArg(6, output_mat);
+
     auto& queue = opencl.queue();
+    // ? Calculates the log-likelihood values for each test instance
     RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
         k_logl_values_1d_mat, cl::NullRange, cl::NDRange(training_length * test_length), cl::NullRange));
 }
 
+// Computes conditional mu.
 template <typename ArrowType>
 void UnivariateKDE::execute_conditional_means(const cl::Buffer& joint_training,
                                               const cl::Buffer&,
@@ -88,6 +107,8 @@ void UnivariateKDE::execute_conditional_means(const cl::Buffer& joint_training,
     k_conditional_means_1d.setArg(5, transform_mean);
     k_conditional_means_1d.setArg(6, output_mat);
     auto& queue = opencl.queue();
+
+    // ? Calculates the log-likelihood values for each test instance
     RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
         k_conditional_means_1d, cl::NullRange, cl::NDRange(training_rows * test_length), cl::NullRange));
 }
@@ -119,7 +140,22 @@ struct MultivariateKDE {
                                           cl::Buffer& tmp_mat,
                                           cl::Buffer& output_mat);
 };
-
+/**
+ * @brief Executes the log-likelihood calculation for a multivariate KDE model.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @param training_mat Training data.
+ * @param training_rows Number of training instances.
+ * @param test_mat Test data.
+ * @param test_physical_rows Number of test instances.
+ * @param test_offset ?
+ * @param test_length Number of test instances.
+ * @param matrices_cols Number of columns of the matrices.
+ * @param cholesky Cholesky decomposition of the bandwidth matrix.
+ * @param lognorm_const log-likelihood constant.
+ * @param tmp_mat Temporary matrix.
+ * @param output_mat Output matrix.
+ */
 template <typename ArrowType>
 void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
                                        const unsigned int training_rows,
@@ -165,6 +201,8 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         k_logl_values_mat.setArg(3, training_rows);
         k_logl_values_mat.setArg(5, lognorm_const);
 
+        // ? Calculates the log-likelihood values for each test instance
+        // TODO: Understand how opencl is used here
         for (unsigned int i = 0; i < test_length; ++i) {
             k_substract.setArg(7, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
@@ -196,6 +234,8 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         k_logl_values_mat.setArg(3, training_rows);
         k_logl_values_mat.setArg(5, lognorm_const);
 
+        // ? Calculates the log-likelihood values for each test instance
+        // TODO: Understand how opencl is used here
         for (unsigned int i = 0; i < training_rows; ++i) {
             k_substract.setArg(7, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
@@ -210,7 +250,7 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         }
     }
 }
-
+// Computes conditional mu.
 template <typename ArrowType>
 void MultivariateKDE::execute_conditional_means(const cl::Buffer& joint_training,
                                                 const cl::Buffer& marg_training,
@@ -447,15 +487,24 @@ DataFrame KDE::_training_data() const {
     auto rb = arrow::RecordBatch::Make(schema, N, columns);
     return DataFrame(rb);
 }
-
+/**
+ * @brief Private function to learn the KDE parameters given the training data.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @tparam contains_null Boolean indicating if the training data contains null values.
+ * @param df Training data.
+ */
 template <typename ArrowType, bool contains_null>
 void KDE::_fit(const DataFrame& df) {
     using CType = typename ArrowType::c_type;
 
     auto d = m_variables.size();
-
+    // NOTE: Here the positive definiteness of the bandwidth is checked
     m_bandwidth = m_bselector->bandwidth(df, m_variables);
-
+    // TODO if bandwidth is not positive definite, what do I do?
+    // e,g,,try to add a small value to the diagonal?
+    // Add to blacklist and exit this iteration?
+    // TODO understand from here on
     auto llt_cov = m_bandwidth.llt();
     auto llt_matrix = llt_cov.matrixLLT();
 
@@ -473,10 +522,23 @@ void KDE::_fit(const DataFrame& df) {
     N = training_data->rows();
     m_training = opencl.copy_to_buffer(training_data->data(), N * d);
 
+    // TODO check if correct: Uses only the diagonal of the cholesky decomposition
     m_lognorm_const =
         -llt_matrix.diagonal().array().log().sum() - 0.5 * d * std::log(2 * util::pi<double>) - std::log(N);
 }
 
+// TODO
+/**
+ * @brief Learns the KDE parameters given the bandwidth matrix, the training data, the training type (?) and the number
+ * of training instances.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @tparam EigenMatrix Eigen matrix type.
+ * @param bandwidth Bandwidth matrix.
+ * @param training_data Training data.
+ * @param training_type Training type.
+ * @param training_instances Number of training instances.
+ */
 template <typename ArrowType, typename EigenMatrix>
 void KDE::fit(EigenMatrix bandwidth,
               cl::Buffer training_data,
@@ -506,10 +568,19 @@ void KDE::fit(EigenMatrix bandwidth,
     m_training = training_data;
     m_training_type = training_type;
     N = training_instances;
+
+    // NOTE: The determinant of the bandwidth matrix is the product of the diagonal elements of the cholesky
     m_lognorm_const = -cholesky.diagonal().array().log().sum() - 0.5 * d * std::log(2 * util::pi<double>) - std::log(N);
     m_fitted = true;
 }
 
+/**
+ * @brief Calculates Log-likelihood of the given data with OpenCL.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @param df Data.
+ * @return VectorXd Log-likelihood values.
+ */
 template <typename ArrowType>
 VectorXd KDE::_logl(const DataFrame& df) const {
     using CType = typename ArrowType::c_type;
@@ -517,14 +588,15 @@ VectorXd KDE::_logl(const DataFrame& df) const {
 
     auto logl_buff = logl_buffer<ArrowType>(df);
     auto& opencl = OpenCLConfig::get();
-    if (df.null_count(m_variables) == 0) {
+    // TODO I don't understand how the log-likelihood is calculated
+    if (df.null_count(m_variables) == 0) {  // No null variables -> Returns the data?
         VectorType read_data(df->num_rows());
         opencl.read_from_buffer(read_data.data(), logl_buff, df->num_rows());
         if constexpr (!std::is_same_v<CType, double>)
             return read_data.template cast<double>();
         else
             return read_data;
-    } else {
+    } else {  // Null variables -> Returns the data without nulls
         auto m = df.valid_rows(m_variables);
         VectorType read_data(m);
         auto bitmap = df.combined_bitmap(m_variables);
@@ -560,7 +632,13 @@ double KDE::_slogl(const DataFrame& df) const {
     opencl.read_from_buffer(&result, buffer_sum, 1);
     return static_cast<double>(result);
 }
-
+/**
+ * @brief Calculates the log-likelihood of the given data using _logl_impl.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @param df Data.
+ * @return cl::Buffer Log-likelihood values.
+ */
 template <typename ArrowType>
 cl::Buffer KDE::logl_buffer(const DataFrame& df) const {
     auto& opencl = OpenCLConfig::get();
@@ -575,6 +653,14 @@ cl::Buffer KDE::logl_buffer(const DataFrame& df) const {
         return _logl_impl<ArrowType, MultivariateKDE>(test_buffer, m);
 }
 
+/**
+ * @brief Calculates the log-likelihood of the given data using _logl_impl.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @param df Data.
+ * @param bitmap Bitmap.
+ * @return cl::Buffer Log-likelihood values.
+ */
 template <typename ArrowType>
 cl::Buffer KDE::logl_buffer(const DataFrame& df, Buffer_ptr& bitmap) const {
     auto& opencl = OpenCLConfig::get();
@@ -589,6 +675,16 @@ cl::Buffer KDE::logl_buffer(const DataFrame& df, Buffer_ptr& bitmap) const {
         return _logl_impl<ArrowType, MultivariateKDE>(test_buffer, m);
 }
 
+// TODO Check here the interesting part?
+/**
+ * @brief Function where the log-likelihood are calculated with OpenCL?.
+ *
+ * @tparam ArrowType Arrow data type.
+ * @tparam KDEType KDE type.
+ * @param test_buffer Test data.
+ * @param m Number of test instances.
+ * @return cl::Buffer Log-likelihood values.
+ */
 template <typename ArrowType, typename KDEType>
 cl::Buffer KDE::_logl_impl(cl::Buffer& test_buffer, int m) const {
     using CType = typename ArrowType::c_type;

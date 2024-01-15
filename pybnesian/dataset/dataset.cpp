@@ -139,6 +139,13 @@ std::vector<std::string> DataFrame::column_names() const {
     return names;
 }
 
+/**
+ * @brief Returns the number of null elements in the array.
+ *
+ * @param begin Iterator to the first element of the array.
+ * @param end Iterator to the last element of the array.
+ * @return int64_t Number of null elements.
+ */
 int64_t null_count(Array_iterator begin, Array_iterator end) {
     int64_t r = 0;
     for (auto it = begin; it != end; it++) {

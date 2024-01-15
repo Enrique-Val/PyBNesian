@@ -165,7 +165,11 @@ void ProductKDE::_fit(const DataFrame& df) {
 
     auto& opencl = OpenCLConfig::get();
 
+    // NOTE: Here the positive definiteness of the bandwidth is checked
     m_bandwidth = m_bselector->diag_bandwidth(df, m_variables);
+    // TODO if bandwidth is not positive definite? e.g., In this case if an eigenvalue is 0
+    // - try to add a small value to the diagonal?
+    // - Add to blacklist and ignore this iteration?
 
     for (size_t i = 0; i < m_variables.size(); ++i) {
         if constexpr (std::is_same_v<CType, double>) {
