@@ -339,7 +339,8 @@ class BuildExt(build_ext):
         pa.create_library_symlinks()
 
     def expand_sources(self):
-        import conv_template
+        """This function expands the 'sources' of the OpenCL code found in 'pybnesian/kde/opencl_kernels/KDE.cl.src' to generate the OpenCL code found in 'pybnesian/kde/opencl_kernels/KDE.cl' and then the C++ code found in 'pybnesian/open_cl/'"""
+        import conv_template  # https://github.com/numpy/numpy/blob/main/numpy/distutils/conv_template.py
 
         sources = ["pybnesian/kde/opencl_kernels/KDE.cl.src"]
 
@@ -436,6 +437,8 @@ namespace opencl {
         import pyarrow as pa
 
         self.create_symlinks()
+
+        # Generates the C++ code from the OpenCL code.
         self.expand_sources()
         self.copy_opencl_code()
         # self.create_clang_tidy_compilation_db(self.extensions)
