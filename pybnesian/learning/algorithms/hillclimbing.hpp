@@ -61,23 +61,24 @@ double validation_delta_score(const T& model,
 /**
  * @brief Executes a greedy hill-climbing algorithm for Bayesian network structure learning.
  *
- * @tparam zero_patience
- * @tparam S
- * @tparam T
- * @param op_set
- * @param score
- * @param start
- * @param arc_blacklist
- * @param arc_whitelist
- * @param type_blacklist
- * @param type_whitelist
- * @param callback
- * @param max_indegree
- * @param max_iters
- * @param epsilon
- * @param patience
- * @param verbose
- * @return std::shared_ptr<T>
+ * @tparam zero_patience True if patience == 0, False otherwise.
+ * @tparam S Type of the score.
+ * @tparam T Type of the Bayesian network.
+ * @param op_set Set of operators in the search process.
+ * @param score Score that drives the search.
+ * @param start Initial structure. A BayesianNetworkBase or ConditionalBayesianNetworkBase.
+ * @param arc_blacklist List of arcs blacklist (forbidden arcs).
+ * @param arc_whitelist List of arcs whitelist (forced arcs).
+ * @param type_blacklist List of type blacklist (forbidden pbn.FactorType).
+ * @param type_whitelist List of type whitelist (forced pbn.FactorType).
+ * @param callback Callback object that is called after each iteration.
+ * @param max_indegree Maximum indegree allowed in the graph.
+ * @param max_iters Maximum number of search iterations.
+ * @param epsilon Minimum delta score allowed for each operator. If (best_op->delta() - epsilon) < util::machine_tol,
+ * then the search process is stopped.
+ * @param patience The patience parameter (only used with ValidatedScore).
+ * @param verbose If True the progress will be displayed, otherwise nothing will be displayed.
+ * @return std::shared_ptr<T> The estimated Bayesian network structure of the same type as start.
  */
 template <bool zero_patience, typename S, typename T>
 std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
@@ -93,12 +94,14 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                                double epsilon,
                                int patience,
                                int verbose) {
+    // Spinner for the progress bar
     auto spinner = util::indeterminate_spinner(verbose);
     spinner->update_status("Checking dataset...");
 
+    // Model initialization
     auto current_model = start.clone();
+    // Model type validation
     current_model->force_type_whitelist(type_whitelist);
-
     if (current_model->has_unknown_node_types()) {
         auto score_data = score.data();
 
@@ -111,22 +114,25 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
         score_data.raise_has_columns(current_model->nodes());
         current_model->set_unknown_node_types(score_data, type_blacklist);
     }
+    // Model arc validation
+    current_model->check_blacklist(arc_blacklist);  // Checks whether the arc_blacklist is valid for the current_model
+    current_model->force_whitelist(arc_whitelist);  // Include the given whitelisted arcs. It checks the validity of the
+                                                    // graph after including the arc whitelist.
 
-    current_model->check_blacklist(arc_blacklist);
-    current_model->force_whitelist(arc_whitelist);
-
+    // OperatorSet initialization
     op_set.set_arc_blacklist(arc_blacklist);
     op_set.set_arc_whitelist(arc_whitelist);
     op_set.set_type_blacklist(type_blacklist);
     op_set.set_type_whitelist(type_whitelist);
     op_set.set_max_indegree(max_indegree);
 
+    // Search models initialization
     auto prev_current_model = current_model->clone();
     auto best_model = current_model;
 
     spinner->update_status("Caching scores...");
 
-    LocalScoreCache local_validation = [&]() {
+    LocalScoreCache local_validation = [&]() {  // Local validation scores (lambda expression)
         if constexpr (std::is_base_of_v<ValidatedScore, S>) {
             LocalScoreCache lc(*current_model);
             lc.cache_vlocal_scores(*current_model, score);
@@ -138,34 +144,37 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
         }
     }();
 
+    // Cache scores
     op_set.cache_scores(*current_model, score);
     int p = 0;
     double accumulated_offset = 0;
 
     OperatorTabuSet tabu_set;
-
     if (callback) callback->call(*current_model, nullptr, score, 0);
 
-    auto iter = 0;
-    // Here the Hill climbing iterations are done
-    while (iter < max_iters) {
-        ++iter;
-
+    // Hill climbing iterations begin
+    for (auto iter = 0; iter < max_iters; ++iter) {
+        // TODO: Update arc_blacklist/type_whitelist
+        // Finds the best operator
+        // Algorithm lines 8 -> 16 [Atienza et al. (2022)]
+        // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
         auto best_op = [&]() {
             if constexpr (zero_patience)
                 return op_set.find_max(*current_model);
             else
                 return op_set.find_max(*current_model, tabu_set);
         }();
-
+        // If the best operator is nullptr or the delta is less than epsilon, then the search process fails and stops
         if (!best_op || (best_op->delta() - epsilon) < util::machine_tol) {
             break;
         }
-
+        // Algorithm lines 17 -> 24 [Atienza et al. (2022)]
+        // Applies the best operator to the current model
         best_op->apply(*current_model);
-
+        // Returns the nodes changed by the best operator
         auto nodes_changed = best_op->nodes_changed(*current_model);
 
+        // Calculates the validation delta
         double validation_delta = [&]() {
             if constexpr (std::is_base_of_v<ValidatedScore, S>) {
                 return validation_delta_score(*current_model, score, nodes_changed, local_validation);
@@ -174,7 +183,8 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             }
         }();
 
-        if ((validation_delta + accumulated_offset) > util::machine_tol) {
+        if ((validation_delta + accumulated_offset) >
+            util::machine_tol) {  // If the validation delta is greater than 0, then the current model is the best model
             if constexpr (!zero_patience) {
                 if (p > 0) {
                     best_model = current_model;
@@ -184,7 +194,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
 
                 tabu_set.clear();
             }
-        } else {
+        } else {  // If the validation delta is less than 0, then the current model is not the best model
             if constexpr (zero_patience) {
                 best_model = prev_current_model;
                 break;
@@ -192,10 +202,11 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                 if (p == 0) best_model = prev_current_model->clone();
                 if (++p > patience) break;
                 accumulated_offset += validation_delta;
-                tabu_set.insert(best_op->opposite(*current_model));
+                tabu_set.insert(best_op->opposite(*current_model));  // Add the opposite operator to the tabu set
             }
         }
 
+        // Updates the previous current model
         best_op->apply(*prev_current_model);
 
         if (callback) callback->call(*current_model, best_op.get(), score, iter);
@@ -252,67 +263,38 @@ std::shared_ptr<T> estimate_downcast_score(OperatorSet& op_set,
                                            double epsilon,
                                            int patience,
                                            int verbose) {
-    if (auto validated_score =
-            dynamic_cast<ValidatedScore*>(&score)) {  // TODO: Is this correct? (seems like a declaration)
-        if (patience == 0) {
-            return estimate_hc<true>(op_set,
-                                     *validated_score,
-                                     start,
-                                     arc_blacklist,
-                                     arc_whitelist,
-                                     type_blacklist,
-                                     type_whitelist,
-                                     callback,
-                                     max_indegree,
-                                     max_iters,
-                                     epsilon,
-                                     patience,
-                                     verbose);
-        } else {
-            return estimate_hc<false>(op_set,
-                                      *validated_score,
-                                      start,
-                                      arc_blacklist,
-                                      arc_whitelist,
-                                      type_blacklist,
-                                      type_whitelist,
-                                      callback,
-                                      max_indegree,
-                                      max_iters,
-                                      epsilon,
-                                      patience,
-                                      verbose);
-        }
+    bool zero_patience = (patience == 0);
+    auto validated_score = dynamic_cast<ValidatedScore*>(&score);
+    // TODO: modularize validated_score in one call
+
+    if (validated_score) {
+        return estimate_hc<zero_patience>(op_set,
+                                          *validated_score,
+                                          start,
+                                          arc_blacklist,
+                                          arc_whitelist,
+                                          type_blacklist,
+                                          type_whitelist,
+                                          callback,
+                                          max_indegree,
+                                          max_iters,
+                                          epsilon,
+                                          patience,
+                                          verbose);
     } else {
-        if (patience == 0) {
-            return estimate_hc<true>(op_set,
-                                     score,
-                                     start,
-                                     arc_blacklist,
-                                     arc_whitelist,
-                                     type_blacklist,
-                                     type_whitelist,
-                                     callback,
-                                     max_indegree,
-                                     max_iters,
-                                     epsilon,
-                                     patience,
-                                     verbose);
-        } else {
-            return estimate_hc<false>(op_set,
-                                      score,
-                                      start,
-                                      arc_blacklist,
-                                      arc_whitelist,
-                                      type_blacklist,
-                                      type_whitelist,
-                                      callback,
-                                      max_indegree,
-                                      max_iters,
-                                      epsilon,
-                                      patience,
-                                      verbose);
-        }
+        return estimate_hc<zero_patience>(op_set,
+                                          score,
+                                          start,
+                                          arc_blacklist,
+                                          arc_whitelist,
+                                          type_blacklist,
+                                          type_whitelist,
+                                          callback,
+                                          max_indegree,
+                                          max_iters,
+                                          epsilon,
+                                          patience,
+                                          verbose);
     }
 }
 /**
