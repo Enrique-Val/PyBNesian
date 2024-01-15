@@ -13,7 +13,27 @@ using opencl::OpenCLConfig, opencl::OpenCL_kernel_traits;
 
 namespace kde {
 
+/**
+ * @brief Class for calculating the Univariate Kernel Density Estimation.
+
+ *
+ */
 struct UnivariateKDE {
+    /**
+     * @brief Executes the log-likelihood calculation for a univariate KDE model.
+     *
+     * @tparam ArrowType Arrow data type.
+     * @param training_vec Training data.
+     * @param training_length Number of training instances.
+     * @param test_vec Test data.
+     * @param int Unused.
+     * @param test_offset ?
+     * @param test_length Number of test instances.
+     * @param int Unused.
+     * @param cholesky Cholesky decomposition of the bandwidth matrix.
+     * @param lognorm_const log-likelihood constant.
+     * @param output_mat Output matrix.
+     */
     template <typename ArrowType>
     void static execute_logl_mat(const cl::Buffer& training_vec,
                                  const unsigned int training_length,
@@ -41,8 +61,9 @@ struct UnivariateKDE {
                                           cl::Buffer& output_mat);
 };
 
+// TODO move to cpp file
 /**
- * @brief Executes the log-likelihood calculation for a univariate KDE model.
+ * @brief Executes the log-likelihood calculation for a univariate KDE model for each variable.
  *
  * @tparam ArrowType Arrow data type.
  * @param training_vec Training data.
@@ -54,7 +75,7 @@ struct UnivariateKDE {
  * @param int Unused.
  * @param cholesky Cholesky decomposition of the bandwidth matrix.
  * @param lognorm_const log-likelihood constant.
- * @param output_mat
+ * @param output_mat Output matrix.
  */
 template <typename ArrowType>
 void UnivariateKDE::execute_logl_mat(const cl::Buffer& training_vec,
@@ -69,6 +90,21 @@ void UnivariateKDE::execute_logl_mat(const cl::Buffer& training_vec,
                                      cl::Buffer&,
                                      cl::Buffer& output_mat) {
     auto& opencl = OpenCLConfig::get();
+    // OpenCL kernel for calculating the log-likelihood values for each test instance
+    //     __kernel void logl_values_1d_mat_double(__global double *restrict train_vector,
+    //                                       __private uint train_rows,
+    //                                       __global double *restrict test_vector,
+    //                                       __private uint test_offset,
+    //                                       __constant double *standard_deviation,
+    //                                       __private double lognorm_factor,
+    //                                       __global double *restrict result) {
+    //     int i = get_global_id(0);
+    //     int train_idx = ROW(i, train_rows);
+    //     int test_idx = COL(i, train_rows);
+    //     double d = (train_vector[train_idx] - test_vector[test_offset + test_idx]) / standard_deviation[0];
+
+    //     result[i] = (-0.5*d*d) + lognorm_factor;
+    // }
     auto& k_logl_values_1d_mat = opencl.kernel(OpenCL_kernel_traits<ArrowType>::logl_values_1d_mat);
     k_logl_values_1d_mat.setArg(0, training_vec);
     k_logl_values_1d_mat.setArg(1, training_length);
@@ -141,7 +177,7 @@ struct MultivariateKDE {
                                           cl::Buffer& output_mat);
 };
 /**
- * @brief Executes the log-likelihood calculation for a multivariate KDE model.
+ * @brief Executes the log-likelihood calculation for a multivariate KDE model for each variable.
  *
  * @tparam ArrowType Arrow data type.
  * @param training_mat Training data.
@@ -202,15 +238,17 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         k_logl_values_mat.setArg(5, lognorm_const);
 
         // ? Calculates the log-likelihood values for each test instance
-        // TODO: Understand how opencl is used here
         for (unsigned int i = 0; i < test_length; ++i) {
             k_substract.setArg(7, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
                 k_substract, cl::NullRange, cl::NDRange(training_rows * matrices_cols), cl::NullRange));
+
             RAISE_ENQUEUEKERNEL_ERROR(
                 queue.enqueueNDRangeKernel(k_solve, cl::NullRange, cl::NDRange(training_rows), cl::NullRange));
+
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
                 k_square, cl::NullRange, cl::NDRange(training_rows * matrices_cols), cl::NullRange));
+
             k_logl_values_mat.setArg(4, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
                 k_logl_values_mat, cl::NullRange, cl::NDRange(training_rows), cl::NullRange));
@@ -235,7 +273,6 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         k_logl_values_mat.setArg(5, lognorm_const);
 
         // ? Calculates the log-likelihood values for each test instance
-        // TODO: Understand how opencl is used here
         for (unsigned int i = 0; i < training_rows; ++i) {
             k_substract.setArg(7, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
@@ -489,6 +526,7 @@ DataFrame KDE::_training_data() const {
 }
 /**
  * @brief Private function to learn the KDE parameters given the training data.
+ * Used in the public function fit in KDE.cpp.
  *
  * @tparam ArrowType Arrow data type.
  * @tparam contains_null Boolean indicating if the training data contains null values.
@@ -500,11 +538,24 @@ void KDE::_fit(const DataFrame& df) {
 
     auto d = m_variables.size();
     // NOTE: Here the positive definiteness of the bandwidth is checked
-    m_bandwidth = m_bselector->bandwidth(df, m_variables);
-    // TODO if bandwidth is not positive definite, what do I do?
-    // - try to add a small value to the diagonal?
-    // - Add to blacklist and exit this iteration?
-    // TODO understand from here on
+    try {
+        m_bandwidth = m_bselector->bandwidth(df, m_variables);
+    } catch (util::singular_covariance_data& e) {
+        // TODO if bandwidth is not positive definite, what do I do?
+        // - try to add a small value to the diagonal?
+        // - Add to blacklist and exit this iteration?
+
+        // Code to add a small value to the diagonal
+        std::cerr << e.what() << std::endl;
+        std::cout << "The bandwidth matrix is not positive definite. Adding a small value to the diagonal."
+                  << std::endl;
+        // TODO: This fails when the matrix has exactly the same value in all the elements
+        m_bandwidth = m_bandwidth + MatrixXd::Identity(d, d) * 1e-6;
+
+        throw e;
+    }
+
+    // Calculates the LLT decomposition matrix of the bandwidth matrix
     auto llt_cov = m_bandwidth.llt();
     auto cholesky = llt_cov.matrixLLT();
 
@@ -713,6 +764,7 @@ cl::Buffer KDE::_logl_impl(cl::Buffer& test_buffer, int m) const {
                                                       m_lognorm_const,
                                                       tmp_mat_buffer,
                                                       mat_logls);
+        // Calculates the log-likelihood values for each test instance
         opencl.logsumexp_cols_offset<ArrowType>(mat_logls, N, allocated_m, res, i * allocated_m);
     }
     auto remaining_m = m - (iterations - 1) * allocated_m;
@@ -728,6 +780,7 @@ cl::Buffer KDE::_logl_impl(cl::Buffer& test_buffer, int m) const {
                                                   m_lognorm_const,
                                                   tmp_mat_buffer,
                                                   mat_logls);
+    // Calculates the log-likelihood values for each test instance
     opencl.logsumexp_cols_offset<ArrowType>(mat_logls, N, remaining_m, res, (iterations - 1) * allocated_m);
 
     return res;
