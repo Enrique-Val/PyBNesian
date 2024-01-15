@@ -502,19 +502,19 @@ void KDE::_fit(const DataFrame& df) {
     // NOTE: Here the positive definiteness of the bandwidth is checked
     m_bandwidth = m_bselector->bandwidth(df, m_variables);
     // TODO if bandwidth is not positive definite, what do I do?
-    // e,g,,try to add a small value to the diagonal?
-    // Add to blacklist and exit this iteration?
+    // - try to add a small value to the diagonal?
+    // - Add to blacklist and exit this iteration?
     // TODO understand from here on
     auto llt_cov = m_bandwidth.llt();
-    auto llt_matrix = llt_cov.matrixLLT();
+    auto cholesky = llt_cov.matrixLLT();
 
     auto& opencl = OpenCLConfig::get();
 
     if constexpr (std::is_same_v<CType, double>) {
-        m_H_cholesky = opencl.copy_to_buffer(llt_matrix.data(), d * d);
+        m_H_cholesky = opencl.copy_to_buffer(cholesky.data(), d * d);
     } else {
         using MatrixType = Matrix<CType, Dynamic, Dynamic>;
-        MatrixType casted_cholesky = llt_matrix.template cast<CType>();
+        MatrixType casted_cholesky = cholesky.template cast<CType>();
         m_H_cholesky = opencl.copy_to_buffer(casted_cholesky.data(), d * d);
     }
 
@@ -522,12 +522,10 @@ void KDE::_fit(const DataFrame& df) {
     N = training_data->rows();
     m_training = opencl.copy_to_buffer(training_data->data(), N * d);
 
-    // TODO check if correct: Uses only the diagonal of the cholesky decomposition
-    m_lognorm_const =
-        -llt_matrix.diagonal().array().log().sum() - 0.5 * d * std::log(2 * util::pi<double>) - std::log(N);
+    // NOTE: The determinant of the bandwidth matrix is the product of the diagonal elements of the cholesky
+    m_lognorm_const = -cholesky.diagonal().array().log().sum() - 0.5 * d * std::log(2 * util::pi<double>) - std::log(N);
 }
 
-// TODO
 /**
  * @brief Learns the KDE parameters given the bandwidth matrix, the training data, the training type (?) and the number
  * of training instances.

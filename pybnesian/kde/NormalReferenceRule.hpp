@@ -158,8 +158,7 @@ private:
 
         auto N = static_cast<CType>(df.valid_rows(variables));
         auto d = static_cast<CType>(variables.size());
-        // TODO check if this is correct (squared)
-        // Normal Reference Rule formula
+        // Normal Reference Rule formula squared for the bandwidth
         auto k = std::pow(4. / (N * (d + 2.)), 2. / (d + 4));
 
         if constexpr (std::is_same_v<ArrowType, arrow::DoubleType>) {
