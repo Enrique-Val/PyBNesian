@@ -1,11 +1,13 @@
-from distutils import log
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-from setuptools.command.build_clib import build_clib
+import os
 import subprocess
 import sys
+from distutils import log
+
 import setuptools
-import os
+from setuptools import Extension, setup
+from setuptools.command.build_clib import build_clib
+from setuptools.command.build_ext import build_ext
+
 import find_opencl
 
 __version__ = "0.4.3"
@@ -234,8 +236,8 @@ class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
 
     def create_options(self):
-        import pyarrow as pa
         import numpy as np
+        import pyarrow as pa
 
         c_opts = {
             "msvc": [
@@ -288,8 +290,8 @@ class BuildExt(build_ext):
 
     # Include libraries from https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
     def finalize_options(self):
-        import pybind11
         import pyarrow as pa
+        import pybind11
 
         build_ext.finalize_options(self)
 
@@ -396,9 +398,10 @@ namespace opencl {
 
         import pathlib
         import sysconfig
-        import pybind11
-        import pyarrow as pa
+
         import numpy as np
+        import pyarrow as pa
+        import pybind11
 
         py_include = sysconfig.get_path("include")
         pybind_include = pybind11.get_include()
