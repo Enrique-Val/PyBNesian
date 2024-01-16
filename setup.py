@@ -4,7 +4,8 @@ import sys
 from distutils import log
 
 import setuptools
-from setuptools import Extension, setup
+from pybind11.setup_helpers import Pybind11Extension
+from setuptools import setup  # Extension
 from setuptools.command.build_clib import build_clib
 from setuptools.command.build_ext import build_ext
 
@@ -19,6 +20,8 @@ else:
 
 
 class CMakeExternalLibrary:
+    """Class to store the CMake configuration of a library."""
+
     def __init__(self, cmake_folder, cmake_flags=[]):
         self.cmake_folder = cmake_folder
 
@@ -29,6 +32,12 @@ class CMakeExternalLibrary:
 
 
 class Build_CMakeExternalLibrary(build_clib):
+    """Class to build a CMake library.
+
+    Args:
+        build_clib (setuptools.command.build_clib.build_clib): setup tools default class to build C libraries.
+    """
+
     def build_libraries(self, libraries):
         ordinary_libs = []
         cmake_libs = []
@@ -97,6 +106,7 @@ class Build_CMakeExternalLibrary(build_clib):
             )
 
             # Copy the libraries to self.build_clib
+            lib_folder = None
             for name in os.listdir(install_directory):
                 # The lib folder can be "lib" or "lib64"
                 if "lib" in name:
@@ -143,7 +153,7 @@ ext_libraries = [
 ]
 
 ext_modules = [
-    Extension(
+    Pybind11Extension(
         "pybnesian.__init__",
         [
             "pybnesian/lib.cpp",
@@ -209,6 +219,7 @@ ext_modules = [
             "pybnesian/models/DynamicBayesianNetwork.cpp",
             "pybnesian/opencl/opencl_config.cpp",
         ],
+        extra_compile_args=["-g"],
         language="c++",
         define_macros=[("VERSION_INFO", __version__)],
     ),
@@ -236,6 +247,11 @@ class BuildExt(build_ext):
     """A custom build extension for adding compiler-specific options."""
 
     def create_options(self):
+        """This function creates the compiler and linker options for the different platforms.
+
+        Returns:
+            setuptools.command.build_ext.build_ext: Extension Modules
+        """
         import numpy as np
         import pyarrow as pa
 
@@ -290,6 +306,11 @@ class BuildExt(build_ext):
 
     # Include libraries from https://stackoverflow.com/questions/54117786/add-numpy-get-include-argument-to-setuptools-without-preinstalled-numpy
     def finalize_options(self):
+        """This function finalizes the options for the different platforms.
+
+        Raises:
+            RuntimeError: If the OpenCL library path is not found.
+        """
         import pyarrow as pa
         import pybind11
 
@@ -336,6 +357,7 @@ class BuildExt(build_ext):
             self.rpath.extend(pa.get_library_dirs())
 
     def create_symlinks(self):
+        """This function creates the symlinks for the pyarrow library."""
         import pyarrow as pa
 
         pa.create_library_symlinks()
@@ -353,6 +375,7 @@ class BuildExt(build_ext):
                 fid.write(outstr)
 
     def copy_opencl_code(self):
+        """This function copies the OpenCL code to a C++ header file."""
         sources = ["pybnesian/kde/opencl_kernels/KDE.cl"]
 
         # Split the CPP code because the MSVC only allow strings of a max size.
@@ -386,7 +409,10 @@ namespace opencl {
             f.write(cpp_code)
 
     def create_clang_tidy_compilation_db(self, extensions):
+        """This function creates a compilation database for clang-tidy."""
+        # UNUSED
         db = "[{}\n]"
+        # TODO: Clean template repeated flags
         template = """
         {{
             "directory": "{0}",
@@ -437,6 +463,7 @@ namespace opencl {
             f.write(json)
 
     def build_extensions(self):
+        """This function builds the extensions."""
         import pyarrow as pa
 
         self.create_symlinks()
@@ -472,14 +499,11 @@ namespace opencl {
             ext.define_macros.append(("PYARROW_VERSION_INFO", pa.__version__))
 
         # The compiled extension depends on a specific version of pyarrow.
-        self.distribution.install_requires = (
-            ["pybind11>=2.6", "pyarrow==" + pa.__version__, "numpy"],
-        )
-        self.distribution.setup_requires = (
-            ["pybind11>=2.6", "pyarrow==" + pa.__version__, "numpy"],
-        )
+        compiled_requires = (["pybind11>=2.6", "pyarrow==" + pa.__version__, "numpy"],)
+        self.distribution.install_requires = compiled_requires
+        self.distribution.setup_requires = compiled_requires
 
-        # opts.append("-g")
+        opts.append("-g")
         # opts.append("-O0")
         # opts.append("-libstd=libc++")
         # opts.append("-ferror-limit=1")
@@ -492,11 +516,12 @@ namespace opencl {
         # opts.append("-fsyntax-only")
 
         # Activate debug mode.
-        # opts.append("-UNDEBUG")
-        # opts.append("-DDEBUG")
+        opts.append("-UNDEBUG")
+        opts.append("-DDEBUG")
 
-        # This reduces the binary size because it removes the debug symbols. Check strip command to create release builds.
-        opts.append("-g0")
+        # This reduces the binary size because it removes the debug symbols, but deactivates debug options (?). Check strip command to create release builds.
+        # opts.append("-g0")
+
         if ct == "unix":
             # opts.append("-march=native")
             opts.append("-fdiagnostics-color=always")
