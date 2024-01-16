@@ -2,6 +2,7 @@
 #define PYBNESIAN_UTIL_ARROW_BASIC_EIGEN_OPS_HPP
 
 #include <util/math_constants.hpp>
+#include <iostream>
 
 namespace util {
 
@@ -132,18 +133,29 @@ Matrix<typename M::Scalar, Dynamic, Dynamic> sqrt_matrix(const M& m) {
 }
 
 // Checks whether M is positive definite.
+/**
+ * @brief Checks whether a matrix M is positive definite.
+ *
+ * @tparam M Matrix type.
+ * @param m Matrix to check.
+ * @return true If M is positive definite.
+ * @return false If M is not positive definite.
+ */
 template <typename M>
 bool is_psd(const M& m) {
     using MatrixType = Matrix<typename M::Scalar, Dynamic, Dynamic>;
-    Eigen::SelfAdjointEigenSolver<MatrixType> eigen_solver(m, Eigen::EigenvaluesOnly);
+    // Eigen::SelfAdjointEigenSolver<MatrixType> eigen_solver(m, Eigen::EigenvaluesOnly);
 
-    auto tol = eigen_solver.eigenvalues().maxCoeff() * m.rows() * std::numeric_limits<typename M::Scalar>::epsilon();
+    // auto tol = eigen_solver.eigenvalues().maxCoeff() * m.rows() * std::numeric_limits<typename M::Scalar>::epsilon();
 
-    if (eigen_solver.eigenvalues().minCoeff() < tol) {
+    Eigen::LLT<MatrixType> lltOfM(m);  // compute the Cholesky decomposition of m
+    if (lltOfM.info() == Eigen::NumericalIssue) {
+        std::cout << "C++ Matrix m:\n" << m << std::endl;
+        std::cout << "CHOLESKY: Possibly non semi-positive definite matrix!" << std::endl;
         return false;
+    } else {
+        return true;
     }
-
-    return true;
 }
 
 }  // namespace util

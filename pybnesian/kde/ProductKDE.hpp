@@ -169,16 +169,13 @@ void ProductKDE::_fit(const DataFrame& df) {
     try {
         m_bandwidth = m_bselector->diag_bandwidth(df, m_variables);
     } catch (util::singular_covariance_data& e) {
-        // TODO if bandwidth is not positive definite, what do I do?
-        // - try to add a small value to the diagonal?
-        // - Add to blacklist and exit this iteration?
-
-        // Code to add a small value to the diagonal
-
         std::cerr << e.what() << std::endl;
-        std::cout << "The bandwidth matrix is not positive definite. Adding a small value to the vector." << std::endl;
-        // TODO: This fails when the matrix has exactly the same value in all the elements
-        m_bandwidth = m_bandwidth + VectorXd::Constant(m_variables.size(), 1e-6);
+
+        // TODO: This doesn't work when the matrix has exactly the same value in all the elements
+        // TODO if bandwidth is not positive definite, try to add a small value to the diagonal?
+        // m_bandwidth = m_bandwidth + VectorXd::Constant(m_variables.size(), 1e-6);
+        // std::cout << "The bandwidth matrix is not positive definite. Adding a small value to the vector." <<
+        // std::endl;
         throw e;
     }
 

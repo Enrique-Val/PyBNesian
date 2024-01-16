@@ -73,7 +73,7 @@ std::shared_ptr<BayesianNetworkBase> hc(const DataFrame& df,
     if (!bn_type && !start) {
         throw std::invalid_argument("\"bn_type\" or \"start\" parameter must be specified.");
     }
-
+    // If seed is not given, it is set to a random value.
     auto iseed = [seed]() {
         if (seed)
             return *seed;
@@ -81,6 +81,7 @@ std::shared_ptr<BayesianNetworkBase> hc(const DataFrame& df,
             return std::random_device{}();
     }();
 
+    // If bn_type is not given, it is set to the type of the given start model.
     const auto& bn_type_ = [&start, &bn_type]() -> const BayesianNetworkType& {
         if (start)
             return start->type_ref();
@@ -88,11 +89,14 @@ std::shared_ptr<BayesianNetworkBase> hc(const DataFrame& df,
             return *bn_type;
     }();
 
+    // Checks if the given operators are valid for the given Bayesian network type ["arcs", "node_type"].
     auto operators = util::check_valid_operators(
         bn_type_, operators_str, arc_blacklist, arc_whitelist, max_indegree, type_whitelist);
 
+    // If max_iters is 0, it is set to the maximum integer value.
     if (max_iters == 0) max_iters = std::numeric_limits<int>::max();
 
+    // If start is given, it is used as the initial model. Otherwise, a new model is created.
     const auto start_model = [&start, &bn_type_, &df]() -> const std::shared_ptr<BayesianNetworkBase> {
         if (start)
             return start;
@@ -101,8 +105,9 @@ std::shared_ptr<BayesianNetworkBase> hc(const DataFrame& df,
     }();
 
     GreedyHillClimbing hc;
-    auto score = util::check_valid_score(df, bn_type_, score_str, iseed, num_folds, test_holdout_ratio);
 
+    // If score is not given, it is set to the default score for the given Bayesian network type.
+    auto score = util::check_valid_score(df, bn_type_, score_str, iseed, num_folds, test_holdout_ratio);
     return hc.estimate(*operators,
                        *score,
                        *start_model,
