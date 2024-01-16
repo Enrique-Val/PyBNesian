@@ -153,7 +153,9 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
     if (callback) callback->call(*current_model, nullptr, score, 0);
 
     // Hill climbing iterations begin
-    for (auto iter = 0; iter < max_iters; ++iter) {
+    auto iter = 0;
+    while (iter < max_iters) {
+        ++iter;
         // TODO: Update arc_blacklist/type_whitelist
         // Finds the best operator
         // Algorithm lines 8 -> 16 [Atienza et al. (2022)]
@@ -263,38 +265,66 @@ std::shared_ptr<T> estimate_downcast_score(OperatorSet& op_set,
                                            double epsilon,
                                            int patience,
                                            int verbose) {
-    bool zero_patience = (patience == 0);
-    auto validated_score = dynamic_cast<ValidatedScore*>(&score);
-    // TODO: modularize validated_score in one call
-
-    if (validated_score) {
-        return estimate_hc<zero_patience>(op_set,
-                                          *validated_score,
-                                          start,
-                                          arc_blacklist,
-                                          arc_whitelist,
-                                          type_blacklist,
-                                          type_whitelist,
-                                          callback,
-                                          max_indegree,
-                                          max_iters,
-                                          epsilon,
-                                          patience,
-                                          verbose);
+    if (auto validated_score = dynamic_cast<ValidatedScore*>(&score)) {
+        if (patience == 0) {
+            return estimate_hc<true>(op_set,
+                                     *validated_score,
+                                     start,
+                                     arc_blacklist,
+                                     arc_whitelist,
+                                     type_blacklist,
+                                     type_whitelist,
+                                     callback,
+                                     max_indegree,
+                                     max_iters,
+                                     epsilon,
+                                     patience,
+                                     verbose);
+        } else {
+            return estimate_hc<false>(op_set,
+                                      *validated_score,
+                                      start,
+                                      arc_blacklist,
+                                      arc_whitelist,
+                                      type_blacklist,
+                                      type_whitelist,
+                                      callback,
+                                      max_indegree,
+                                      max_iters,
+                                      epsilon,
+                                      patience,
+                                      verbose);
+        }
     } else {
-        return estimate_hc<zero_patience>(op_set,
-                                          score,
-                                          start,
-                                          arc_blacklist,
-                                          arc_whitelist,
-                                          type_blacklist,
-                                          type_whitelist,
-                                          callback,
-                                          max_indegree,
-                                          max_iters,
-                                          epsilon,
-                                          patience,
-                                          verbose);
+        if (patience == 0) {
+            return estimate_hc<true>(op_set,
+                                     score,
+                                     start,
+                                     arc_blacklist,
+                                     arc_whitelist,
+                                     type_blacklist,
+                                     type_whitelist,
+                                     callback,
+                                     max_indegree,
+                                     max_iters,
+                                     epsilon,
+                                     patience,
+                                     verbose);
+        } else {
+            return estimate_hc<false>(op_set,
+                                      score,
+                                      start,
+                                      arc_blacklist,
+                                      arc_whitelist,
+                                      type_blacklist,
+                                      type_whitelist,
+                                      callback,
+                                      max_indegree,
+                                      max_iters,
+                                      epsilon,
+                                      patience,
+                                      verbose);
+        }
     }
 }
 /**
