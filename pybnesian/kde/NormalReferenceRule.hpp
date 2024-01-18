@@ -23,7 +23,8 @@ public:
         size_t valid_rows = df.valid_rows(variables);
         if (valid_rows <= variables.size()) {  // If the number of (valid) rows is less than the number of variables
             std::stringstream ss;
-            ss << "Diagonal bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
+            ss << "NormalReferenceRule::diag_bandwidth -> Diagonal bandwidth matrix of "
+               << std::to_string(variables.size()) << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -38,7 +39,9 @@ public:
             case Type::FLOAT:
                 return diag_bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
+                throw std::invalid_argument(
+                    "NormalReferenceRule::diag_bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data "
+                    "is expected.");
         }
     }
     /**
@@ -56,7 +59,8 @@ public:
         if (static_cast<size_t>(valid_rows) <=
             variables.size()) {  // If the number of (valid) rows is less than the number of variables
             std::stringstream ss;
-            ss << "Bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
+            ss << "NormalReferenceRule::bandwidth -> Bandwidth matrix of " << std::to_string(variables.size())
+               << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -72,7 +76,9 @@ public:
             case Type::FLOAT:
                 return bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
+                throw std::invalid_argument(
+                    "NormalReferenceRule::bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data is "
+                    "expected.");
         }
     }
 
@@ -103,7 +109,7 @@ private:
 
         if (!util::is_psd(cov)) {
             std::stringstream ss;
-            ss << "Covariance matrix for variables [" << variables[0];
+            ss << "NormalReferenceRule::diag_bandwidth -> Covariance matrix for variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -146,9 +152,8 @@ private:
         auto cov = df.cov<ArrowType>(variables);
 
         if (!util::is_psd(*cov)) {  // If the covariance matrix is not positive definite
-            // TODO hacer apaño aquí
             std::stringstream ss;
-            ss << "Covariance matrix for variables [" << variables[0];
+            ss << "NormalReferenceRule::bandwidth -> Covariance matrix for variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }

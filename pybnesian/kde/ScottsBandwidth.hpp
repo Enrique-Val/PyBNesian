@@ -19,7 +19,8 @@ public:
         size_t valid_rows = df.valid_rows(variables);
         if (valid_rows <= 1) {
             std::stringstream ss;
-            ss << "Diagonal bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
+            ss << "ScottsBandwidth::diag_bandwidth -> Diagonal bandwidth matrix of " << std::to_string(variables.size())
+               << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -34,7 +35,9 @@ public:
             case Type::FLOAT:
                 return diag_bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
+                throw std::invalid_argument(
+                    "ScottsBandwidth::diag_bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data is "
+                    "expected.");
         }
     }
     /**
@@ -50,7 +53,8 @@ public:
         size_t valid_rows = df.valid_rows(variables);
         if (valid_rows <= variables.size()) {
             std::stringstream ss;
-            ss << "Bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
+            ss << "ScottsBandwidth::bandwidth -> Bandwidth matrix of " << std::to_string(variables.size())
+               << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -65,7 +69,9 @@ public:
             case Type::FLOAT:
                 return bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
+                throw std::invalid_argument(
+                    "ScottsBandwidth::bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data is "
+                    "expected.");
         }
     }
 
@@ -125,7 +131,7 @@ private:
 
         if (!util::is_psd(*cov)) {
             std::stringstream ss;
-            ss << "Covariance matrix for variables [" << variables[0];
+            ss << "ScottsBandwidth::bandwidth -> Covariance matrix for variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }

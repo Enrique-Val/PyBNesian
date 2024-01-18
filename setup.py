@@ -408,59 +408,59 @@ namespace opencl {
         with open("pybnesian/opencl/opencl_code.hpp", "w") as f:
             f.write(cpp_code)
 
-    def create_clang_tidy_compilation_db(self, extensions):
-        """This function creates a compilation database for clang-tidy."""
-        # UNUSED
-        db = "[{}\n]"
-        # TODO: Clean template repeated flags
-        template = """
-        {{
-            "directory": "{0}",
-            "file": "{1}",
-            "output": "{2}",
-            "arguments": ["/usr/lib/llvm-11/bin/clang", "-xc++", "{1}", "-Wno-unused-result", "-Wsign-compare", "-D", "NDEBUG", "-g", "-fwrapv", "-O2", "-Wall", "-g", "-fstack-protector-strong", "-Wformat", "-Werror=format-security", "-g", "-fwrapv", "-O2", "-g", "-fstack-protector-strong", "-Wformat", "-Werror=format-security", "-Wdate-time", "-D", "_FORTIFY_SOURCE=2", "-fPIC", "-D", "VERSION_INFO={3}", "-I", "{4}", "-I", "pybnesian/", "-I", "lib/libfort", "-I", "{5}", "-c", "-o", "{6}", "-std=c++17", "-isystem", "{6}", "-isystem", "{7}", "-isystem", "lib/eigen-3.3.7", "-isystem", "lib/OpenCL", "-isystem", "lib/boost", "-isystem", "lib/indicators", "-D", "_GLIBCXX_USE_CXX11_ABI=0", "-fdiagnostics-color=always", "-Wall", "-Wextra", "-fvisibility=hidden", "--target=x86_64-pc-linux-gnu"]
-        }}"""
-        conf_files = []
+    # def create_clang_tidy_compilation_db(self, extensions):
+    #     """This function creates a compilation database for clang-tidy."""
+    #     # UNUSED
+    #     db = "[{}\n]"
+    #     # TODO: Clean template repeated flags
+    #     template = """
+    #     {{
+    #         "directory": "{0}",
+    #         "file": "{1}",
+    #         "output": "{2}",
+    #         "arguments": ["/usr/lib/llvm-11/bin/clang", "-xc++", "{1}", "-Wno-unused-result", "-Wsign-compare", "-D", "NDEBUG", "-g", "-fwrapv", "-O2", "-Wall", "-g", "-fstack-protector-strong", "-Wformat", "-Werror=format-security", "-g", "-fwrapv", "-O2", "-g", "-fstack-protector-strong", "-Wformat", "-Werror=format-security", "-Wdate-time", "-D", "_FORTIFY_SOURCE=2", "-fPIC", "-D", "VERSION_INFO={3}", "-I", "{4}", "-I", "pybnesian/", "-I", "lib/libfort", "-I", "{5}", "-c", "-o", "{6}", "-std=c++17", "-isystem", "{6}", "-isystem", "{7}", "-isystem", "lib/eigen-3.3.7", "-isystem", "lib/OpenCL", "-isystem", "lib/boost", "-isystem", "lib/indicators", "-D", "_GLIBCXX_USE_CXX11_ABI=0", "-fdiagnostics-color=always", "-Wall", "-Wextra", "-fvisibility=hidden", "--target=x86_64-pc-linux-gnu"]
+    #     }}"""
+    #     conf_files = []
 
-        import pathlib
-        import sysconfig
+    #     import pathlib
+    #     import sysconfig
 
-        import numpy as np
-        import pyarrow as pa
-        import pybind11
+    #     import numpy as np
+    #     import pyarrow as pa
+    #     import pybind11
 
-        py_include = sysconfig.get_path("include")
-        pybind_include = pybind11.get_include()
-        pyarrow_include = pa.get_include()
-        numpy_include = np.get_include()
+    #     py_include = sysconfig.get_path("include")
+    #     pybind_include = pybind11.get_include()
+    #     pyarrow_include = pa.get_include()
+    #     numpy_include = np.get_include()
 
-        for ext in extensions:
-            for s in ext.sources:
-                p = pathlib.Path(s)
-                relative_path = pathlib.Path(*p.parts[1:-1])
+    #     for ext in extensions:
+    #         for s in ext.sources:
+    #             p = pathlib.Path(s)
+    #             relative_path = pathlib.Path(*p.parts[1:-1])
 
-                new_file = pathlib.Path(os.path.splitext(p.parts[-1])[0] + ".o")
+    #             new_file = pathlib.Path(os.path.splitext(p.parts[-1])[0] + ".o")
 
-                output = pathlib.Path(
-                    self.path_to_build_folder(), relative_path, new_file
-                )
-                conf_files.append(
-                    template.format(
-                        os.getcwd(),
-                        s,
-                        str(output),
-                        __version__,
-                        py_include,
-                        pybind_include,
-                        pyarrow_include,
-                        numpy_include,
-                    )
-                )
+    #             output = pathlib.Path(
+    #                 self.path_to_build_folder(), relative_path, new_file
+    #             )
+    #             conf_files.append(
+    #                 template.format(
+    #                     os.getcwd(),
+    #                     s,
+    #                     str(output),
+    #                     __version__,
+    #                     py_include,
+    #                     pybind_include,
+    #                     pyarrow_include,
+    #                     numpy_include,
+    #                 )
+    #             )
 
-        json = db.format(",".join(conf_files))
+    #     json = db.format(",".join(conf_files))
 
-        with open("compile_commands.json", "w") as f:
-            f.write(json)
+    #     with open("compile_commands.json", "w") as f:
+    #         f.write(json)
 
     def build_extensions(self):
         """This function builds the extensions."""
@@ -503,7 +503,7 @@ namespace opencl {
         self.distribution.install_requires = compiled_requires
         self.distribution.setup_requires = compiled_requires
 
-        opts.append("-g")
+        # opts.append("-g")
         # opts.append("-O0")
         # opts.append("-libstd=libc++")
         # opts.append("-ferror-limit=1")
@@ -516,8 +516,8 @@ namespace opencl {
         # opts.append("-fsyntax-only")
 
         # Activate debug mode.
-        opts.append("-UNDEBUG")
-        opts.append("-DDEBUG")
+        # opts.append("-UNDEBUG")
+        # opts.append("-DDEBUG")
 
         # This reduces the binary size because it removes the debug symbols, but deactivates debug options (?). Check strip command to create release builds.
         # opts.append("-g0")
