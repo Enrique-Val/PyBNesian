@@ -485,7 +485,7 @@ private:
     ArcStringVector m_whitelist;
     int max_indegree;
 };
-
+// TODO CHECK HOW BEST OP IS FOUND
 template <bool limited_indegree>
 std::shared_ptr<Operator> ArcOperatorSet::find_max_indegree(const BayesianNetworkBase& model) const {
     auto delta_ptr = delta.data();
@@ -503,6 +503,7 @@ std::shared_ptr<Operator> ArcOperatorSet::find_max_indegree(const BayesianNetwor
         const auto& target = model.collapsed_name(target_collapsed);
 
         if (model.has_arc(source, target)) {
+            // TODO CHECK THIS
             return std::make_shared<RemoveArc>(source, target, delta(source_collapsed, target_collapsed));
         } else if (model.has_arc(target, source) && model.can_flip_arc(target, source)) {
             if constexpr (limited_indegree) {

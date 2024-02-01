@@ -90,6 +90,7 @@ void UnivariateKDE::execute_logl_mat(const cl::Buffer& training_vec,
                                      cl::Buffer&,
                                      cl::Buffer& output_mat) {
     auto& opencl = OpenCLConfig::get();
+    // TODO: This is the kernel that is executed, might be wrong?
     // OpenCL kernel for calculating the log-likelihood values for each test instance
     //     __kernel void logl_values_1d_mat_double(__global double *restrict train_vector,
     //                                       __private uint train_rows,
@@ -206,19 +207,55 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
                                        cl::Buffer& output_mat) {
     auto& opencl = OpenCLConfig::get();
 
+    // __kernel void substract_double(__global double* restrict training_matrix,
+    //                                __private uint training_physical_rows,
+    //                                __private uint training_offset,
+    //                                __private uint training_rows,
+    //                                __global double* restrict test_matrix,
+    //                                __private uint test_physical_rows,
+    //                                __private uint test_offset,
+    //                                __private uint test_row_idx,
+    //                                __global double* restrict res) {
+    //     uint i = get_global_id(0);
+    //     uint r = ROW(i, training_rows) + training_offset;
+    //     uint c = COL(i, training_rows);
+    //     res[i] = test_matrix[IDX(test_offset + test_row_idx, c, test_physical_rows)] -
+    //              training_matrix[IDX(r, c, training_physical_rows)];
+    // }
     auto& k_substract = opencl.kernel(OpenCL_kernel_traits<ArrowType>::substract);
 
+    // __kernel void solve_double(__global double* restrict diff_matrix,
+    //                            __private uint diff_matrix_rows,
+    //                            __private uint matrices_cols,
+    //                            __global double* restrict cholesky_matrix) {
+    //     uint r = get_global_id(0);
+
+    //     for (uint c = 0; c < matrices_cols; c++) {
+    //         for (uint i = 0; i < c; i++) {
+    //             diff_matrix[IDX(r, c, diff_matrix_rows)] -=
+    //                 cholesky_matrix[IDX(c, i, matrices_cols)] * diff_matrix[IDX(r, i, diff_matrix_rows)];
+    //         }
+    //         diff_matrix[IDX(r, c, diff_matrix_rows)] /= cholesky_matrix[IDX(c, c, matrices_cols)];
+    //     }
+    // }
     auto& k_solve = opencl.kernel(OpenCL_kernel_traits<ArrowType>::solve);
     k_solve.setArg(0, tmp_mat);
     k_solve.setArg(2, matrices_cols);
     k_solve.setArg(3, cholesky);
 
+    // __kernel void square_double(__global double* restrict m) {
+    //     uint idx = get_global_id(0);
+    //     double d = m[idx];
+    //     m[idx] = d * d;
+    // }
     auto& k_square = opencl.kernel(OpenCL_kernel_traits<ArrowType>::square);
     k_square.setArg(0, tmp_mat);
 
     auto& queue = opencl.queue();
 
-    if (training_rows > test_length) {
+    if (training_rows >
+        test_length) {  // When the number of training instances is greater than the number of test instances
+        // Test Matrix - Training Matrix
         k_substract.setArg(0, training_mat);
         k_substract.setArg(1, training_rows);
         k_substract.setArg(2, 0u);
@@ -237,7 +274,7 @@ void MultivariateKDE::execute_logl_mat(const cl::Buffer& training_mat,
         k_logl_values_mat.setArg(3, training_rows);
         k_logl_values_mat.setArg(5, lognorm_const);
 
-        // ? Calculates the log-likelihood values for each test instance
+        // NOTE: Calculates the log-likelihood values for each test instance
         for (unsigned int i = 0; i < test_length; ++i) {
             k_substract.setArg(7, i);
             RAISE_ENQUEUEKERNEL_ERROR(queue.enqueueNDRangeKernel(
