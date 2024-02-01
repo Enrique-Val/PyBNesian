@@ -254,7 +254,7 @@ void ArcOperatorSet::cache_scores(const ConditionalBayesianNetworkBase& model, c
         }
     }
 }
-
+// TODO CHECK THIS
 std::shared_ptr<Operator> ArcOperatorSet::find_max(const BayesianNetworkBase& model) const {
     raise_uninitialized();
 
