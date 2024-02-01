@@ -8,7 +8,15 @@
 using learning::scores::ValidatedScore, learning::scores::HoldoutLikelihood, learning::scores::CVLikelihood;
 
 namespace learning::scores {
+/**
+ * @brief This class mixes the functionality of CVLikelihood and HoldoutLikelihood. First, it applies a HoldOut split
+ over the data. Then:
+    - It estimates the training score using a CVLikelihood over the training data.
+    - It estimates the validation score using the training data to estimate the parameters and calculating the
+ log-likelihood on the holdout data.
 
+ *
+ */
 class ValidatedLikelihood : public ValidatedScore {
 public:
     ValidatedLikelihood(const DataFrame& df,
