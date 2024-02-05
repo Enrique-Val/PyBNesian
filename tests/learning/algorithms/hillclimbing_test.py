@@ -1,10 +1,12 @@
 import numpy as np
+import pytest
 
 import pybnesian as pbn
 import util_test
 from pybnesian import BayesianNetwork, BayesianNetworkType
 
 df = util_test.generate_normal_data(1000)
+dep_df = util_test.generate_normal_data_dep(1000)
 
 
 def test_hc_estimate():
@@ -206,6 +208,27 @@ def test_hc_shortcut_function():
         df, bn_type=MyRestrictedGaussianNetworkType(), score="bic", operators=["arcs"]
     )
     assert type(model) == NewBN
+
+
+def test_hc_kde_arc_singular_covariance():  # TODO: This test should be corrected so that it doesn't raise exceptions
+    spbn = pbn.KDENetwork(nodes=["a", "b"])
+    print("Sample Covariance")
+    print(dep_df.cov())
+    
+    with pytest.raises(pbn.SingularCovarianceData) as ex:
+        spbn = pbn.hc(
+            dep_df,
+            start=spbn,
+            # type_whitelist=[("a", pbn.CKDEType()), ("b", pbn.CKDEType())],
+            max_iters=int(1e4),
+            verbose=True,
+        )
+    assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
+        ex.value
+    )
+
+
+# TODO: Test for when one variable has 0 variance in k-fold cross-validation for CKDEType
 
 
 class MyRestrictedGaussianNetworkType(BayesianNetworkType):
