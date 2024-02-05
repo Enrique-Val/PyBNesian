@@ -243,20 +243,28 @@ def test_productkde_logl():
         logl = cpd.logl(_test_df)
 
         npdata = _df.loc[:, variables].to_numpy()
-        final_scipy_kde = gaussian_kde(npdata.T)
+        # final_scipy_kde = gaussian_kde(npdata.T)
+        final_scipy_kde = gaussian_kde(
+            npdata.T,
+            bw_method=lambda s: np.power(4 / (s.d + 2), 1 / (s.d + 4))
+            * s.scotts_factor(),
+        )
+        # TODO this overwriting doesn't seem to work with scipy, we have to find different way to set bandwith matrix
         final_scipy_kde.covariance = np.diag(cpd.bandwidth)
-        final_scipy_kde.inv_cov = np.diag(1.0 / cpd.bandwidth)
+        final_scipy_kde.inv_cov = np.diag(
+            1.0 / cpd.bandwidth
+        )  # TODO variable can't be set
         final_scipy_kde.log_det = (
             cpd.bandwidth.shape[0] * np.log(2 * np.pi) + np.log(cpd.bandwidth).sum()
         )
-
+        assert np.all(np.isclose(np.diag(cpd.bandwidth), final_scipy_kde.covariance))
         test_npdata = _test_df.loc[:, variables].to_numpy()
-        scipy = final_scipy_kde.logpdf(test_npdata.T)
+        scipy_logl = final_scipy_kde.logpdf(test_npdata.T)
 
         if np.all(_df.dtypes == "float32"):
-            assert np.all(np.isclose(logl, scipy, atol=0.0005))
+            assert np.all(np.isclose(logl, scipy_logl, atol=0.0005))
         else:
-            assert np.all(np.isclose(logl, scipy))
+            assert np.all(np.isclose(logl, scipy_logl))  # TODO fails
 
     test_df = util_test.generate_normal_data(50, seed=1)
     test_df_float = test_df.astype("float32")
@@ -298,12 +306,12 @@ def test_productkde_logl_null():
         )
 
         test_npdata = _test_df.loc[:, variables].to_numpy()
-        scipy = final_scipy_kde.logpdf(test_npdata.T)
+        scipy_logl = final_scipy_kde.logpdf(test_npdata.T)
 
         if npdata.dtype == "float32":
-            assert np.all(np.isclose(logl, scipy, atol=0.0005, equal_nan=True))
+            assert np.all(np.isclose(logl, scipy_logl, atol=0.0005, equal_nan=True))
         else:
-            assert np.all(np.isclose(logl, scipy, equal_nan=True))
+            assert np.all(np.isclose(logl, scipy_logl, equal_nan=True))
 
     TEST_SIZE = 50
 
