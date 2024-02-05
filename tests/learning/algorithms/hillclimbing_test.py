@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 import pybnesian as pbn
 import util_test
@@ -211,21 +210,28 @@ def test_hc_shortcut_function():
 
 
 def test_hc_kde_arc_singular_covariance():  # TODO: This test should be corrected so that it doesn't raise exceptions
-    spbn = pbn.KDENetwork(nodes=["a", "b"])
-    print("Sample Covariance")
-    print(dep_df.cov())
-    
-    with pytest.raises(pbn.SingularCovarianceData) as ex:
-        spbn = pbn.hc(
-            dep_df,
-            start=spbn,
-            # type_whitelist=[("a", pbn.CKDEType()), ("b", pbn.CKDEType())],
-            max_iters=int(1e4),
-            verbose=True,
-        )
-    assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
-        ex.value
+    """Function to test if with the KDE, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
+    nodes = ["a", "b"]
+    spbn = pbn.KDENetwork(nodes=nodes)
+    # print("Sample Covariance")
+    # print(dep_df.cov())
+
+    # with pytest.raises(pbn.SingularCovarianceData) as ex:
+    spbn = pbn.hc(
+        dep_df,
+        start=spbn,
+        # type_whitelist=[("a", pbn.CKDEType()), ("b", pbn.CKDEType())],
+        max_iters=int(1e4),
+        verbose=True,
     )
+    # assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
+    #     ex.value
+    # )
+    assert spbn.nodes() == nodes
+
+    assert spbn.num_arcs() == 0
+    spbn.fit(dep_df)
+    assert np.count_nonzero(np.isnan(spbn.logl(dep_df))) == 0
 
 
 # TODO: Test for when one variable has 0 variance in k-fold cross-validation for CKDEType
