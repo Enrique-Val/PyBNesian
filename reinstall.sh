@@ -3,7 +3,9 @@
 export CC="ccache gcc"
 pip uninstall pybnesian -y
 # python setup.py clean --all
-rm -rf build/temp.linux-x86_64-cpython-310/pybnesian/
+# rm -rf build/temp.linux-x86_64-cpython-310/pybnesian/
+rm -rf build/lib.linux-x86_64-cpython-310
+
 
 time python setup.py install
 # python setup.py develop # For verbose output
