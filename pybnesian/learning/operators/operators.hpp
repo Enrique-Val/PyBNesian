@@ -292,26 +292,43 @@ private:
     SetType m_set;
 };
 
+/**
+ * @brief Cache of local scores for each node in the network.
+ *
+ */
 class LocalScoreCache {
 public:
     LocalScoreCache() : m_local_score() {}
     LocalScoreCache(const BayesianNetworkBase& m) : m_local_score(m.num_nodes()) {}
 
+    /**
+     * @brief Cache local scores for each node in the network.
+     *
+     * @param model Bayesian network
+     * @param score Score
+     */
     void cache_local_scores(const BayesianNetworkBase& model, const Score& score) {
+        // Checks if the cache has the right size
         if (m_local_score.rows() != model.num_nodes()) {
             m_local_score = VectorXd(model.num_nodes());
         }
-
+        // Caches the local score for each node
         for (const auto& node : model.nodes()) {
             m_local_score(model.collapsed_index(node)) = score.local_score(model, node);
         }
     }
-
+    /**
+     * @brief Cache Validated local scores for each node in the network.
+     *
+     * @param model Bayesian network
+     * @param score Validated score
+     */
     void cache_vlocal_scores(const BayesianNetworkBase& model, const ValidatedScore& score) {
+        // Checks if the cache has the right size
         if (m_local_score.rows() != model.num_nodes()) {
             m_local_score = VectorXd(model.num_nodes());
         }
-
+        // Caches the validated local score for each node
         for (const auto& node : model.nodes()) {
             m_local_score(model.collapsed_index(node)) = score.vlocal_score(model, node);
         }
