@@ -222,3 +222,21 @@ def generate_indep_hybrid_data(size, seed=0):
             "C6": c6_values,
         }
     )
+
+
+def generate_normal_data_dep(size, seed=0):
+    """Generate a dataframe with dependent normal variables.
+
+    Args:
+        size (int): Size of the dataframe.
+        seed (int, optional): Random seed. Defaults to 0.
+
+    Returns:
+        pd.DataFrame: Dataframe with dependent normal variables.
+    """
+    np.random.seed(seed)
+
+    a_array = np.random.normal(3, 0.5, size=size)
+    b_array = 2 * a_array
+
+    return pd.DataFrame({"a": a_array, "b": b_array})
