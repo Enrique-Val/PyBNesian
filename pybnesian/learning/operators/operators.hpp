@@ -851,6 +851,13 @@ private:
     std::vector<std::shared_ptr<OperatorSet>> m_op_sets;
 };
 
+/**
+ * @brief Cache local scores for each of the operators in the pool with the given model and score.
+ *
+ * @tparam M Model type
+ * @param model Bayesian network
+ * @param score Score
+ */
 template <typename M>
 void OperatorPool::cache_scores(const M& model, const Score& score) {
     if (!this->m_local_cache) {
