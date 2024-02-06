@@ -42,7 +42,16 @@ std::shared_ptr<BayesianNetworkBase> hc(const DataFrame& df,
                                         int num_folds,
                                         double test_holdout_ratio,
                                         int verbose = 0);
-
+/**
+ * @brief Calculates the validation delta score for each of the variables.
+ *
+ * @tparam T Type of the Bayesian network.
+ * @param model Bayesian network.
+ * @param val_score Validated score.
+ * @param variables List of variables.
+ * @param current_local_scores Local score cache.
+ * @return double The validation delta score.
+ */
 template <typename T>
 double validation_delta_score(const T& model,
                               const ValidatedScore& val_score,
@@ -94,146 +103,196 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                                double epsilon,
                                int patience,
                                int verbose) {
-    // Spinner for the progress bar
-    auto spinner = util::indeterminate_spinner(verbose);
-    spinner->update_status("Checking dataset...");
+    try {
+        std::cout << "HILL-CLIMBING::estimate_hc BEGINS\t" << std::endl;
+        // We copy the arc_blacklist
+        // auto arc_blacklist_copy = arc_blacklist;
 
-    // Model initialization
-    auto current_model = start.clone();
-    // Model type validation
-    current_model->force_type_whitelist(type_whitelist);
-    if (current_model->has_unknown_node_types()) {
-        auto score_data = score.data();
+        // Spinner for the progress bar
+        auto spinner = util::indeterminate_spinner(verbose);
+        spinner->update_status("Checking dataset...");
 
-        if (score_data->num_columns() == 0) {
-            throw std::invalid_argument(
-                "The score does not have data to detect the node types. Set the node types for"
-                " all the nodes in the Bayesian network or use an score that uses data (it implements Score::data).");
+        // Model initialization
+        auto current_model = start.clone();
+        // Model type validation
+        current_model->force_type_whitelist(type_whitelist);
+        if (current_model->has_unknown_node_types()) {
+            auto score_data = score.data();
+
+            if (score_data->num_columns() == 0) {
+                throw std::invalid_argument(
+                    "The score does not have data to detect the node types. Set the node types for"
+                    " all the nodes in the Bayesian network or use an score that uses data (it implements "
+                    "Score::data).");
+            }
+
+            score_data.raise_has_columns(current_model->nodes());
+            current_model->set_unknown_node_types(score_data, type_blacklist);
         }
+        // Model arc validation
+        current_model->check_blacklist(
+            arc_blacklist);  // Checks whether the arc_blacklist is valid for the current_model
+        current_model->force_whitelist(arc_whitelist);  // Include the given whitelisted arcs. It checks the validity of
+                                                        // the graph after including the arc whitelist.
 
-        score_data.raise_has_columns(current_model->nodes());
-        current_model->set_unknown_node_types(score_data, type_blacklist);
-    }
-    // Model arc validation
-    current_model->check_blacklist(arc_blacklist);  // Checks whether the arc_blacklist is valid for the current_model
-    current_model->force_whitelist(arc_whitelist);  // Include the given whitelisted arcs. It checks the validity of the
-                                                    // graph after including the arc whitelist.
+        // OperatorSet initialization
+        op_set.set_arc_blacklist(arc_blacklist);
+        op_set.set_arc_whitelist(arc_whitelist);
+        op_set.set_type_blacklist(type_blacklist);
+        op_set.set_type_whitelist(type_whitelist);
+        op_set.set_max_indegree(max_indegree);
 
-    // OperatorSet initialization
-    op_set.set_arc_blacklist(arc_blacklist);
-    op_set.set_arc_whitelist(arc_whitelist);
-    op_set.set_type_blacklist(type_blacklist);
-    op_set.set_type_whitelist(type_whitelist);
-    op_set.set_max_indegree(max_indegree);
+        // Search model initialization
+        auto prev_current_model = current_model->clone();
+        auto best_model = current_model;
 
-    // Search models initialization
-    auto prev_current_model = current_model->clone();
-    auto best_model = current_model;
+        spinner->update_status("Caching scores...");
 
-    spinner->update_status("Caching scores...");
+        // TODO: Here the score of each node is calculated (log-likelihood fit?)
+        // TODO: Peta si hay variables sueltas con varianza 0 -> Arreglar
+        // (cv_likelihood.cpp: 31) Partiendo de que se empieza con los nodos sin padres, se calcula el score
+        // independiente, y da que no es 0 Opciones:
+        // 1. Se calcula el score independiente, y tras fallar el fit de log-likelihood se hace regularización?
+        // 2. Se elimina la variable?
+        // 3. Hacer try-catch para que cuando de error, se añada regularización al score
 
-    LocalScoreCache local_validation = [&]() {  // Local validation scores (lambda expression)
-        if constexpr (std::is_base_of_v<ValidatedScore, S>) {
-            LocalScoreCache lc(*current_model);
-            lc.cache_vlocal_scores(*current_model, score);
-            return lc;
-        } else if constexpr (std::is_base_of_v<Score, S>) {
-            return LocalScoreCache{};
-        } else {
-            static_assert(util::always_false<S>, "Wrong Score class for hill-climbing.");
-        }
-    }();
-
-    // Cache scores
-    op_set.cache_scores(*current_model, score);
-    int p = 0;
-    double accumulated_offset = 0;
-
-    OperatorTabuSet tabu_set;
-    if (callback) callback->call(*current_model, nullptr, score, 0);
-
-    // Hill climbing iterations begin
-    auto iter = 0;
-    while (iter < max_iters) {
-        ++iter;
-        // TODO: Update arc_blacklist/type_whitelist
-        // Finds the best operator
-        // Algorithm lines 8 -> 16 [Atienza et al. (2022)]
-        // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
-        auto best_op = [&]() {
-            if constexpr (zero_patience)
-                return op_set.find_max(*current_model);
-            else
-                return op_set.find_max(*current_model, tabu_set);
-        }();
-        // If the best operator is nullptr or the delta is less than epsilon, then the search process fails and stops
-        if (!best_op || (best_op->delta() - epsilon) < util::machine_tol) {
-            break;
-        }
-        // Algorithm lines 17 -> 24 [Atienza et al. (2022)]
-        // Applies the best operator to the current model
-        best_op->apply(*current_model);
-        // Returns the nodes changed by the best operator
-        auto nodes_changed = best_op->nodes_changed(*current_model);
-
-        // Calculates the validation delta
-        double validation_delta = [&]() {
-            if constexpr (std::is_base_of_v<ValidatedScore, S>) {
-                return validation_delta_score(*current_model, score, nodes_changed, local_validation);
+        // Initializes the local validation scores for the current model
+        std::cout << "Local Validation TBC:\t" << std::endl;
+        LocalScoreCache local_validation = [&]() {                 // Local validation scores (lambda expression)
+            if constexpr (std::is_base_of_v<ValidatedScore, S>) {  // If the score is a ValidatedScore
+                LocalScoreCache lc(*current_model);                // Local score cache
+                lc.cache_vlocal_scores(*current_model, score);     // Cache the local scores
+                return lc;
+            } else if constexpr (std::is_base_of_v<Score, S>) {  // If the score is a generic Score
+                return LocalScoreCache{};
             } else {
-                return best_op->delta();
+                static_assert(util::always_false<S>, "Wrong Score class for hill-climbing.");
             }
         }();
+        std::cout << "Local Validation Calculated:\t" << std::endl;
 
-        if ((validation_delta + accumulated_offset) >
-            util::machine_tol) {  // If the validation delta is greater than 0, then the current model is the best model
-            if constexpr (!zero_patience) {
-                if (p > 0) {
-                    best_model = current_model;
-                    p = 0;
-                    accumulated_offset = 0;
-                }
-
-                tabu_set.clear();
-            }
-        } else {  // If the validation delta is less than 0, then the current model is not the best model
-            if constexpr (zero_patience) {
-                best_model = prev_current_model;
+        // Cache scores
+        // TODO: Aquí está petando
+        std::cout << "op_set.cache_scores TBC:\t" << std::endl;
+        // Caches the delta score values of each operator in the set.
+        op_set.cache_scores(*current_model, score);
+        int p = 0;
+        double accumulated_offset = 0;
+        std::cout << "Scores cached:\t" << std::endl;
+        OperatorTabuSet tabu_set;
+        if (callback) callback->call(*current_model, nullptr, score, 0);
+        std::cout << "Hill climbing iterations begin:\t" << std::endl;
+        // Hill climbing iterations begin
+        auto iter = 0;
+        while (iter < max_iters) {
+            ++iter;
+            // Finds the best operator
+            // HC Algorithm lines 8 -> 16 [Atienza et al. (2022)]
+            // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
+            // TODO: Here the best operators are evaluated (log-likelihood fit?)
+            std::cout << "Best operator TBC:\t" << std::endl;
+            auto best_op = [&]() {
+                if constexpr (zero_patience)
+                    return op_set.find_max(*current_model);
+                else
+                    return op_set.find_max(*current_model, tabu_set);
+            }();
+            if (!best_op || (best_op->delta() - epsilon) < util::machine_tol) {
                 break;
             } else {
-                if (p == 0) best_model = prev_current_model->clone();
-                if (++p > patience) break;
-                accumulated_offset += validation_delta;
-                tabu_set.insert(best_op->opposite(*current_model));  // Add the opposite operator to the tabu set
+                std::cout << "Best operator:\t" << best_op->ToString() << std::endl;
             }
-        }
+            std::cout << "Best operator Calculated:\t" << std::endl;
+            // If the best operator is nullptr or the delta is less than epsilon, then the search process fails and
+            // stops
 
-        // Updates the previous current model
-        best_op->apply(*prev_current_model);
+            // TODO: Teóricamente, de aquí en adelante, no debería petar más el modelo...
+            // S_validation puede pasar try { Algorithm lines 17 -> 24 [Atienza et al. (2022)] Applies the best operator
+            // to the current model
+            best_op->apply(*current_model);
+            // Returns the nodes changed by the best operator
+            auto nodes_changed = best_op->nodes_changed(*current_model);
 
-        if (callback) callback->call(*current_model, best_op.get(), score, iter);
+            // Calculates the validation delta
+            std::cout << "Validation Delta TBC:\t" << std::endl;
+            double validation_delta = [&]() {
+                if constexpr (std::is_base_of_v<ValidatedScore, S>) {
+                    return validation_delta_score(*current_model, score, nodes_changed, local_validation);
+                } else {
+                    return best_op->delta();
+                }
+            }();
+            std::cout << "Validation Delta Calculated:\t" << std::endl;
+            // Updates the best model if the validation delta is greater than 0
+            if ((validation_delta + accumulated_offset) >
+                util::machine_tol) {  // If the validation delta is greater than 0, then the current model is the best
+                                      // model
+                std::cout << "Validation Delta is greater than 0:\t" << std::endl;
+                if constexpr (!zero_patience) {
+                    if (p > 0) {
+                        best_model = current_model;
+                        p = 0;
+                        accumulated_offset = 0;
+                    }
 
-        op_set.update_scores(*current_model, score, nodes_changed);
+                    tabu_set.clear();
+                }
+            } else {  // If the validation delta is less than 0, then the current model is not the best model
+                std::cout << "Validation Delta is less than 0:\t" << std::endl;
+                if constexpr (zero_patience) {
+                    best_model = prev_current_model;
+                    break;
+                } else {
+                    if (p == 0) best_model = prev_current_model->clone();
+                    if (++p > patience) break;
+                    accumulated_offset += validation_delta;
+                    tabu_set.insert(best_op->opposite(*current_model));  // Add the opposite operator to the tabu set
+                }
+            }
 
-        if constexpr (std::is_base_of_v<ValidatedScore, S>) {
-            spinner->update_status(best_op->ToString() + " | Validation delta: " + std::to_string(validation_delta));
-        } else if constexpr (std::is_base_of_v<Score, S>) {
-            spinner->update_status(best_op->ToString());
-        } else {
-            static_assert(util::always_false<S>, "Wrong Score class for hill-climbing.");
-        }
-    }  // End of Hill climbing iterations
+            // Updates the previous current model
+            best_op->apply(*prev_current_model);
 
-    op_set.finished();
+            if (callback) callback->call(*current_model, best_op.get(), score, iter);
+            std::cout << "Updating scores:\t" << std::endl;
+            op_set.update_scores(*current_model, score, nodes_changed);
+            std::cout << "Scores updated:\t" << std::endl;
+            if constexpr (std::is_base_of_v<ValidatedScore, S>) {
+                spinner->update_status(best_op->ToString() +
+                                       " | Validation delta: " + std::to_string(validation_delta));
+            } else if constexpr (std::is_base_of_v<Score, S>) {
+                spinner->update_status(best_op->ToString());
+            } else {
+                static_assert(util::always_false<S>, "Wrong Score class for hill-climbing.");
+            }
 
-    if (callback) callback->call(*best_model, nullptr, score, iter);
+        }  // End of Hill climbing iterations
 
-    spinner->mark_as_completed("Finished Hill-climbing!");
-    return best_model;
+        op_set.finished();
+
+        if (callback) callback->call(*best_model, nullptr, score, iter);
+
+        spinner->mark_as_completed("Finished Hill-climbing!");
+        return best_model;
+    } catch (util::singular_covariance_data& e) {
+        std::cout << "hillclimbing.hpp::estimate_hc catch:\t" << e.what() << std::endl;
+        throw e;
+        //     auto arc_best_op = dynamic_cast<ArcOperator*>(best_op.get());
+        //     auto source_arc = arc_best_op->source();
+        //     auto target_arc = arc_best_op->target();
+
+        //     std::cout << e.what() << std::endl;
+        //     std::cout << "Source arc:\t" << source_arc << std::endl;
+        //     std::cout << "Target arc:\t" << target_arc << std::endl;
+
+        //     arc_blacklist_copy.push_back(std::make_pair(source_arc, target_arc));
+        //     std::cout << "New arc_blacklist:\t" << arc_blacklist << std::endl;
+        //     op_set.set_arc_blacklist(arc_blacklist_copy);
+    }
 }
 /**
- * @brief Depending on the validated_score and the patience of the hill climbing algorithm it estimates the structure of
- * the Bayesian network.
+ * @brief Depending on the validated_score and the patience of the hill climbing algorithm it estimates the
+ * structure of the Bayesian network.
  *
  * @tparam T
  * @param op_set
