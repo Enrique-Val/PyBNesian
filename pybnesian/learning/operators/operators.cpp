@@ -16,6 +16,12 @@ std::shared_ptr<Operator> AddArc::opposite(const ConditionalBayesianNetworkBase&
     return opposite(static_cast<const BayesianNetworkBase&>(m));
 }
 
+/**
+ * @brief Updates the valid operations matrix and the delta matrix.
+ * The idea is that arc_whitelist and arc_blacklist are operations that have to be ignored.
+ *
+ * @param model BayesianNetwork.
+ */
 void ArcOperatorSet::update_valid_ops(const BayesianNetworkBase& model) {
     int num_nodes = model.num_nodes();
 
@@ -96,7 +102,12 @@ double cache_score_operation(const BayesianNetworkBase& model,
         return d;
     }
 }
-
+/**
+ * @brief Cache scores for the given BayesianNetwork and ArcOperator score.
+ *
+ * @param model BayesianNetwork.
+ * @param score Score.
+ */
 void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score& score) {
     if (!score.compatible_bn(model)) {
         throw std::invalid_argument("BayesianNetwork is not compatible with the score.");
@@ -108,24 +119,38 @@ void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score&
         this->m_local_cache->cache_local_scores(model, score);
     }
 
-    update_valid_ops(model);
+    update_valid_ops(model);  // Updates a matrix of valid operations and a matrix of delta scores.
 
     auto bn_type = model.type();
-    for (const auto& target_node : model.nodes()) {
+    std::cout << "ArcOperatorSet::cache_scores about to begin" << std::endl;
+    for (const auto& target_node : model.nodes()) {  // Iterates over all target_node in the model.
         std::vector<std::string> new_parents_target = model.parents(target_node);
         int target_collapsed = model.collapsed_index(target_node);
-        for (const auto& source_node : model.nodes()) {
+        for (const auto& source_node : model.nodes()) {  // Iterates over all source_node in the model.
             int source_collapsed = model.collapsed_index(source_node);
             if (valid_op(source_collapsed, target_collapsed) &&
-                bn_type->can_have_arc(model, source_node, target_node)) {
-                delta(source_collapsed, target_collapsed) =
-                    cache_score_operation(model,
-                                          score,
-                                          source_node,
-                                          target_node,
-                                          new_parents_target,
-                                          m_local_cache->local_score(model, source_node),
-                                          m_local_cache->local_score(model, target_node));
+                bn_type->can_have_arc(
+                    model, source_node, target_node)) {  // If the arc operation (source_node, target_node) is valid.
+                // TODO: Here the score is calculated and may fail if the covariance matrix is singular.
+                try {
+                    delta(source_collapsed, target_collapsed) =
+                        cache_score_operation(model,
+                                              score,
+                                              source_node,
+                                              target_node,
+                                              new_parents_target,
+                                              m_local_cache->local_score(model, source_node),
+                                              m_local_cache->local_score(model, target_node));
+                } catch (const util::singular_covariance_data& e) {
+                    // In case singular covariance data is found, the operation is marked as invalid in both arc
+                    // directions and the delta is set to the lowest possible value (ArcOperatorSet::update_valid_ops).
+                    std::cerr << e.what() << std::endl;
+                    valid_op(source_collapsed, target_collapsed) = false;
+                    valid_op(target_collapsed, source_collapsed) = false;
+                    delta(source_collapsed, target_collapsed) = std::numeric_limits<double>::lowest();
+                    delta(target_collapsed, source_collapsed) = std::numeric_limits<double>::lowest();
+                    std::cout << "valid_op and delta updated" << std::endl;
+                }
             }
         }
     }
@@ -209,7 +234,12 @@ void ArcOperatorSet::update_valid_ops(const ConditionalBayesianNetworkBase& mode
         }
     }
 }
-
+/**
+ * @brief Cache scores for the given ConditionalBayesianNetwork and ArcOperator score.
+ *
+ * @param model BayesianNetwork.
+ * @param score Score.
+ */
 void ArcOperatorSet::cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score) {
     if (!score.compatible_bn(model)) {
         throw std::invalid_argument("BayesianNetwork is not compatible with the score.");
@@ -435,7 +465,12 @@ void ArcOperatorSet::update_scores(const ConditionalBayesianNetworkBase& model,
         update_incoming_arcs_scores(model, score, n);
     }
 }
-
+/**
+ * @brief Cache scores for the given ConditionalBayesianNetwork and ChangeNodeTypeSet score.
+ *
+ * @param model BayesianNetwork.
+ * @param score Score.
+ */
 void ChangeNodeTypeSet::cache_scores(const BayesianNetworkBase& model, const Score& score) {
     if (model.type_ref().is_homogeneous()) {
         throw std::invalid_argument("ChangeNodeTypeSet can only be used with non-homogeneous Bayesian networks.");
