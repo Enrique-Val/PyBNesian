@@ -209,46 +209,47 @@ def test_hc_shortcut_function():
     assert type(model) == NewBN
 
 
-def test_hc_kde_arc_singular_covariance():
-    """Function to test if with the KDE, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
+def test_hc_arc_singular_covariance():
+    """Function to test if with the GBN, KDE and SPBN, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
     column_names = list(dep_df.columns.values)
-    spbn = pbn.KDENetwork(nodes=column_names)
-    # with pytest.raises(pbn.SingularCovarianceData) as ex:
-    spbn = pbn.hc(
+    # GBN
+    gbn = pbn.GaussianNetwork(nodes=column_names)
+    gbn = pbn.hc(
         dep_df,
-        start=spbn,
+        start=gbn,
         max_iters=int(1e4),
         verbose=True,
     )
-    # assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
-    #     ex.value
-    # )
-
-    assert spbn.num_arcs() == 0
-    spbn.fit(dep_df)
-    assert np.count_nonzero(np.isnan(spbn.logl(dep_df))) == 0
+    gbn.fit(dep_df)
+    assert gbn.num_arcs() == 0
+    assert np.count_nonzero(np.isnan(gbn.logl(dep_df))) == 0
     for c in column_names:
-        print(f"{spbn.cpd(c)}")
+        print(f"{gbn.cpd(c)}")
 
-
-def test_hc_spbn_arc_singular_covariance():  # TODO: This test should be corrected so that it doesn't raise exceptions
-    """Function to test if with the SPBN, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
-    column_names = list(dep_df.columns.values)
-    spbn = pbn.SemiparametricBN(nodes=column_names)
-
-    # with pytest.raises(pbn.SingularCovarianceData) as ex:
-    spbn = pbn.hc(
+    # KDE
+    kde = pbn.KDENetwork(nodes=column_names)
+    kde = pbn.hc(
         dep_df,
-        start=spbn,
-        # type_whitelist=[("a", pbn.CKDEType()), ("b", pbn.CKDEType())],
+        start=kde,
         max_iters=int(1e4),
         verbose=True,
     )
-    print(f"Number of arcs:\t{spbn.num_arcs()}")
-    # assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
-    #     ex.value
-    # )
+    kde.fit(dep_df)
+    assert kde.num_arcs() == 0
+    assert np.count_nonzero(np.isnan(kde.logl(dep_df))) == 0
+    for c in column_names:
+        print(f"{kde.cpd(c)}")
+
+    # SPBN
+    spbn = pbn.SemiparametricBN(nodes=column_names)
+    spbn = pbn.hc(
+        dep_df,
+        start=spbn,
+        max_iters=int(1e4),
+        verbose=True,
+    )
     spbn.fit(dep_df)
+    assert spbn.num_arcs() == 0
     assert np.count_nonzero(np.isnan(spbn.logl(dep_df))) == 0
     for c in column_names:
         print(f"{spbn.cpd(c)}")
