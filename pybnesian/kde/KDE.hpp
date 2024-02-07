@@ -578,7 +578,7 @@ void KDE::_fit(const DataFrame& df) {
     try {
         m_bandwidth = m_bselector->bandwidth(df, m_variables);
     } catch (util::singular_covariance_data& e) {
-        std::cerr << "KDE::_fit" << e.what() << std::endl;
+        std::cerr << "KDE::_fit:\t" << e.what() << std::endl;
         // TODO: This doesn't work when the matrix has exactly the same value in all the elements
         // TODO if bandwidth is not positive definite, try to add a small value to the diagonal?
         // std::cout << "The bandwidth matrix is " << m_bandwidth << std::endl;
