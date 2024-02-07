@@ -144,12 +144,13 @@ void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score&
                 } catch (const util::singular_covariance_data& e) {
                     // In case singular covariance data is found, the operation is marked as invalid in both arc
                     // directions and the delta is set to the lowest possible value (ArcOperatorSet::update_valid_ops).
-                    std::cerr << e.what() << std::endl;
+                    std::cerr << "ArcOperatorSet::cache_scores\t" << e.what() << std::endl;
                     valid_op(source_collapsed, target_collapsed) = false;
                     valid_op(target_collapsed, source_collapsed) = false;
                     delta(source_collapsed, target_collapsed) = std::numeric_limits<double>::lowest();
                     delta(target_collapsed, source_collapsed) = std::numeric_limits<double>::lowest();
-                    std::cout << "valid_op and delta updated" << std::endl;
+                    std::cout << "ArcOperatorSet::cache_scores\t"
+                              << "valid_op and delta updated" << std::endl;
                 }
             }
         }

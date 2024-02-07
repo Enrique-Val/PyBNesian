@@ -104,7 +104,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                                int patience,
                                int verbose) {
     try {
-        std::cout << "HILL-CLIMBING::estimate_hc BEGINS\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tbegins" << std::endl;
         // We copy the arc_blacklist
         // auto arc_blacklist_copy = arc_blacklist;
 
@@ -157,7 +157,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
         // 3. Hacer try-catch para que cuando de error, se añada regularización al score
 
         // Initializes the local validation scores for the current model
-        std::cout << "Local Validation TBC:\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tLocal Validation TBC" << std::endl;
         LocalScoreCache local_validation = [&]() {                 // Local validation scores (lambda expression)
             if constexpr (std::is_base_of_v<ValidatedScore, S>) {  // If the score is a ValidatedScore
                 LocalScoreCache lc(*current_model);                // Local score cache
@@ -169,19 +169,19 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                 static_assert(util::always_false<S>, "Wrong Score class for hill-climbing.");
             }
         }();
-        std::cout << "Local Validation Calculated:\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tLocal Validation Calculated" << std::endl;
 
         // Cache scores
         // TODO: Aquí está petando
-        std::cout << "op_set.cache_scores TBC:\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\top_set.cache_scores TBC" << std::endl;
         // Caches the delta score values of each operator in the set.
         op_set.cache_scores(*current_model, score);
         int p = 0;
         double accumulated_offset = 0;
-        std::cout << "Scores cached:\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tScores cached" << std::endl;
         OperatorTabuSet tabu_set;
         if (callback) callback->call(*current_model, nullptr, score, 0);
-        std::cout << "Hill climbing iterations begin:\t" << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tHill climbing iterations begin" << std::endl;
         // Hill climbing iterations begin
         auto iter = 0;
         while (iter < max_iters) {
@@ -190,7 +190,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             // HC Algorithm lines 8 -> 16 [Atienza et al. (2022)]
             // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
             // TODO: Here the best operators are evaluated (log-likelihood fit?)
-            std::cout << "Best operator TBC:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tBest operator TBC" << std::endl;
             auto best_op = [&]() {
                 if constexpr (zero_patience)
                     return op_set.find_max(*current_model);
@@ -198,11 +198,10 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                     return op_set.find_max(*current_model, tabu_set);
             }();
             if (!best_op || (best_op->delta() - epsilon) < util::machine_tol) {
+                std::cout << "HILL-CLIMBING::estimate_hc:\tNo improvement in best_op" << std::endl;
                 break;
-            } else {
-                std::cout << "Best operator:\t" << best_op->ToString() << std::endl;
             }
-            std::cout << "Best operator Calculated:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tBest operator Calculated" << best_op->ToString() << std::endl;
             // If the best operator is nullptr or the delta is less than epsilon, then the search process fails and
             // stops
 
@@ -214,7 +213,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             auto nodes_changed = best_op->nodes_changed(*current_model);
 
             // Calculates the validation delta
-            std::cout << "Validation Delta TBC:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tValidation Delta TBC" << std::endl;
             double validation_delta = [&]() {
                 if constexpr (std::is_base_of_v<ValidatedScore, S>) {
                     return validation_delta_score(*current_model, score, nodes_changed, local_validation);
@@ -222,12 +221,12 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                     return best_op->delta();
                 }
             }();
-            std::cout << "Validation Delta Calculated:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tValidation Delta Calculated" << std::endl;
             // Updates the best model if the validation delta is greater than 0
             if ((validation_delta + accumulated_offset) >
                 util::machine_tol) {  // If the validation delta is greater than 0, then the current model is the best
                                       // model
-                std::cout << "Validation Delta is greater than 0:\t" << std::endl;
+                std::cout << "HILL-CLIMBING::estimate_hc:\tValidation Delta is greater than 0" << std::endl;
                 if constexpr (!zero_patience) {
                     if (p > 0) {
                         best_model = current_model;
@@ -238,7 +237,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
                     tabu_set.clear();
                 }
             } else {  // If the validation delta is less than 0, then the current model is not the best model
-                std::cout << "Validation Delta is less than 0:\t" << std::endl;
+                std::cout << "HILL-CLIMBING::estimate_hc:\tValidation Delta is less than 0" << std::endl;
                 if constexpr (zero_patience) {
                     best_model = prev_current_model;
                     break;
@@ -254,9 +253,9 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             best_op->apply(*prev_current_model);
 
             if (callback) callback->call(*current_model, best_op.get(), score, iter);
-            std::cout << "Updating scores:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tUpdating scores" << std::endl;
             op_set.update_scores(*current_model, score, nodes_changed);
-            std::cout << "Scores updated:\t" << std::endl;
+            std::cout << "HILL-CLIMBING::estimate_hc:\tScores updated" << std::endl;
             if constexpr (std::is_base_of_v<ValidatedScore, S>) {
                 spinner->update_status(best_op->ToString() +
                                        " | Validation delta: " + std::to_string(validation_delta));
@@ -275,7 +274,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
         spinner->mark_as_completed("Finished Hill-climbing!");
         return best_model;
     } catch (util::singular_covariance_data& e) {
-        std::cout << "hillclimbing.hpp::estimate_hc catch:\t" << e.what() << std::endl;
+        std::cout << "HILL-CLIMBING::estimate_hc:\tcatch" << e.what() << std::endl;
         throw e;
         //     auto arc_best_op = dynamic_cast<ArcOperator*>(best_op.get());
         //     auto source_arc = arc_best_op->source();
