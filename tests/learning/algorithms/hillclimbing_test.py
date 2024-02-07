@@ -209,12 +209,32 @@ def test_hc_shortcut_function():
     assert type(model) == NewBN
 
 
-def test_hc_kde_arc_singular_covariance():  # TODO: This test should be corrected so that it doesn't raise exceptions
+def test_hc_kde_arc_singular_covariance():
     """Function to test if with the KDE, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
-    nodes = ["a", "b"]
-    spbn = pbn.KDENetwork(nodes=nodes)
-    # print("Sample Covariance")
-    # print(dep_df.cov())
+    column_names = list(dep_df.columns.values)
+    spbn = pbn.KDENetwork(nodes=column_names)
+    # with pytest.raises(pbn.SingularCovarianceData) as ex:
+    spbn = pbn.hc(
+        dep_df,
+        start=spbn,
+        max_iters=int(1e4),
+        verbose=True,
+    )
+    # assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
+    #     ex.value
+    # )
+
+    assert spbn.num_arcs() == 0
+    spbn.fit(dep_df)
+    assert np.count_nonzero(np.isnan(spbn.logl(dep_df))) == 0
+    for c in column_names:
+        print(f"{spbn.cpd(c)}")
+
+
+def test_hc_spbn_arc_singular_covariance():  # TODO: This test should be corrected so that it doesn't raise exceptions
+    """Function to test if with the SPBN, the HC algorithm raises an exception when the covariance matrix is singular. Then we check if the learnt model is valid."""
+    column_names = list(dep_df.columns.values)
+    spbn = pbn.SemiparametricBN(nodes=column_names)
 
     # with pytest.raises(pbn.SingularCovarianceData) as ex:
     spbn = pbn.hc(
@@ -224,14 +244,14 @@ def test_hc_kde_arc_singular_covariance():  # TODO: This test should be correcte
         max_iters=int(1e4),
         verbose=True,
     )
+    print(f"Number of arcs:\t{spbn.num_arcs()}")
     # assert "Covariance matrix for variables [a, b] is not positive-definite." in str(
     #     ex.value
     # )
-    assert spbn.nodes() == nodes
-
-    assert spbn.num_arcs() == 0
     spbn.fit(dep_df)
     assert np.count_nonzero(np.isnan(spbn.logl(dep_df))) == 0
+    for c in column_names:
+        print(f"{spbn.cpd(c)}")
 
 
 # TODO: Test for when one variable has 0 variance in k-fold cross-validation for CKDEType
