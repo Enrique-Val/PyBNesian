@@ -1,8 +1,9 @@
 #ifndef PYBNESIAN_UTIL_ARROW_BASIC_EIGEN_OPS_HPP
 #define PYBNESIAN_UTIL_ARROW_BASIC_EIGEN_OPS_HPP
 
+#include <sstream>
 #include <util/math_constants.hpp>
-#include <iostream>
+#include <util/progress.hpp>
 
 namespace util {
 
@@ -144,14 +145,15 @@ Matrix<typename M::Scalar, Dynamic, Dynamic> sqrt_matrix(const M& m) {
 template <typename M>
 bool is_psd(const M& m) {
     using MatrixType = Matrix<typename M::Scalar, Dynamic, Dynamic>;
-    // Eigen::SelfAdjointEigenSolver<MatrixType> eigen_solver(m, Eigen::EigenvaluesOnly);
-
-    // auto tol = eigen_solver.eigenvalues().maxCoeff() * m.rows() * std::numeric_limits<typename M::Scalar>::epsilon();
 
     Eigen::LLT<MatrixType> lltOfM(m);  // compute the Cholesky decomposition of m
     if (lltOfM.info() == Eigen::NumericalIssue) {
-        std::cout << "C++ Matrix m:\n" << m << std::endl;
-        std::cout << "CHOLESKY: Possibly non semi-positive definite matrix!" << std::endl;
+        std::stringstream ss;
+        ss << "basic_eigen_ops.hpp::is_psd:\t"
+           << "C++ Matrix m:\n"
+           << m << "\nCHOLESKY: Possibly non semi-positive definite matrix!";
+        std::string log_str = ss.str();
+        util::formatted_log_t(true, log_str);
         return false;
     } else {
         return true;
