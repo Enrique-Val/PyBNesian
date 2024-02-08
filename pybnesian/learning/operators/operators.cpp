@@ -3,6 +3,7 @@
 #include <learning/scores/scores.hpp>
 #include <learning/operators/operators.hpp>
 #include <util/validate_whitelists.hpp>
+#include <util/progress.hpp>
 
 using models::BayesianNetworkType, models::SemiparametricBNType;
 
@@ -109,6 +110,7 @@ double cache_score_operation(const BayesianNetworkBase& model,
  * @param score Score.
  */
 void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score& score) {
+    std::string log_str = "ArcOperatorSet::cache_scores:\t";
     if (!score.compatible_bn(model)) {
         throw std::invalid_argument("BayesianNetwork is not compatible with the score.");
     }
@@ -122,7 +124,6 @@ void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score&
     update_valid_ops(model);  // Updates a matrix of valid operations and a matrix of delta scores.
 
     auto bn_type = model.type();
-    std::cout << "ArcOperatorSet::cache_scores about to begin" << std::endl;
     for (const auto& target_node : model.nodes()) {  // Iterates over all target_node in the model.
         std::vector<std::string> new_parents_target = model.parents(target_node);
         int target_collapsed = model.collapsed_index(target_node);
@@ -144,13 +145,14 @@ void ArcOperatorSet::cache_scores(const BayesianNetworkBase& model, const Score&
                 } catch (const util::singular_covariance_data& e) {
                     // In case singular covariance data is found, the operation is marked as invalid in both arc
                     // directions and the delta is set to the lowest possible value (ArcOperatorSet::update_valid_ops).
-                    std::cerr << "ArcOperatorSet::cache_scores\t" << e.what() << std::endl;
+                    util::formatted_log_t(true, log_str + e.what());
+
                     valid_op(source_collapsed, target_collapsed) = false;
                     valid_op(target_collapsed, source_collapsed) = false;
                     delta(source_collapsed, target_collapsed) = std::numeric_limits<double>::lowest();
                     delta(target_collapsed, source_collapsed) = std::numeric_limits<double>::lowest();
-                    std::cout << "ArcOperatorSet::cache_scores\t"
-                              << "valid_op and delta updated" << std::endl;
+
+                    util::formatted_log_t(true, log_str + "valid_op and delta updated");
                 }
             }
         }
