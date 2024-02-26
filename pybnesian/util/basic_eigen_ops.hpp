@@ -146,8 +146,8 @@ template <typename M>
 bool is_psd(const M& m) {
     using MatrixType = Matrix<typename M::Scalar, Dynamic, Dynamic>;
 
-    Eigen::LLT<MatrixType> lltOfM(m);              // compute the Cholesky decomposition of m
-    if (lltOfM.info() == Eigen::NumericalIssue) {  // NOTE: FIXED
+    Eigen::LLT<MatrixType> lltOfM(m);  // compute the Cholesky decomposition of m
+    if (lltOfM.info() == Eigen::NumericalIssue) {
         std::stringstream ss;
         ss << "basic_eigen_ops.hpp::is_psd:\t"
            << "C++ Matrix m:\n"
