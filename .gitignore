@@ -151,6 +151,3 @@ docs/source/_build
 *.aux
 *.dvi
 *.synctex.gz
-
-# Custom Ignore
-aux/
