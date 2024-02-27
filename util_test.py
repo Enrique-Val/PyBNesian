@@ -238,5 +238,6 @@ def generate_normal_data_dep(size, seed=0):
 
     a_array = np.random.normal(3, 0.5, size=size)
     b_array = 2 * a_array
+    c_array = 3 * b_array
 
-    return pd.DataFrame({"a": a_array, "b": b_array})
+    return pd.DataFrame({"a": a_array, "b": b_array, "c": c_array})

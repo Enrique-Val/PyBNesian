@@ -344,7 +344,7 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
     auto bn_type = model.type();
     for (const auto& source_node : model.nodes()) {
         auto source_collapsed = model.collapsed_index(source_node);
-
+        util::formatted_log_t(true, log_str + "source_node: " + source_node + " and target_node: " + target_node);
         if (valid_op(source_collapsed, target_collapsed)) {
             // ARC FLIPPING source_node -> target_node to target_node -> source_node:
             if (model.has_arc(source_node,
@@ -363,7 +363,7 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
                     bn_type->can_have_arc(
                         model, target_node, source_node)) {  // If the reverse arc (target_node -> source_node) is
                                                              // possible, then put the reverse arc
-                                                             // TODO: Peta aquí y el try catch no lo pilla :-(
+
                     util::formatted_log_t(true,
                                           log_str +
                                               "valid_op(target_collapsed, source_collapsed) "
@@ -373,7 +373,8 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
                     double d2;
                     try {
                         // score of adding (target_node -> source_collapsed)
-                        d2 = score.local_score(model, source_node, parents_source) -  // New score with the added arc
+                        d2 = d +
+                             score.local_score(model, source_node, parents_source) -  // New score with the added arc
                              this->m_local_cache->local_score(model, source_node);    // Old score without the arc
                     } catch (const util::singular_covariance_data& e) {
                         util::formatted_log_t(true, log_str + e.what());
@@ -385,8 +386,8 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
                         util::formatted_log_t(true, log_str + "valid_op and delta updated");
                     }
                     delta(target_collapsed, source_collapsed) =
-                        d + d2;  // score of removing (source_collapsed -> target_node) and adding
-                                 // (target_node -> source_collapsed)
+                        d2;  // score of reversing (source_collapsed -> target_node) to (target_node ->
+                             // source_collapsed)
                 }
             } else if (model.has_arc(target_node, source_node) &&
                        bn_type->can_have_arc(
@@ -405,17 +406,33 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
                 parents.push_back(source_node);
 
                 // TODO: Review and separate into two operations
-                double d =  // Update flip arc score: target_node -> source_node to source_node -> target_node
-                    score.local_score(
-                        model, target_node, parents) +  // New score after adding source_node as parent of target_node
-                    score.local_score(
-                        model,
-                        source_node,
-                        parents_source) -  // New score after removing target_node as parent of source_node
-                    this->m_local_cache->local_score(model, source_node) -  // Old score without target_node as parent
-                                                                            // of source_node
-                    this->m_local_cache->local_score(model, target_node);   // Old score with source_node as parent of
-                                                                            // target_node
+                // Update flip arc score: target_node -> source_node to source_node -> target_node
+                double d;
+                try {
+                    d = score.local_score(model,
+                                          target_node,
+                                          parents) +  // New score after adding source_node as parent of target_node
+                        score.local_score(
+                            model,
+                            source_node,
+                            parents_source) -  // New score after removing target_node as parent of source_node
+                        this->m_local_cache->local_score(model, target_node) -
+                        this->m_local_cache->local_score(model, source_node);
+
+                } catch (const util::singular_covariance_data& e) {
+                    // In case singular covariance data is found, the operation is marked as invalid in both arc
+                    // directions and the delta is set to the lowest possible value (ArcOperatorSet::update_valid_ops).
+                    util::formatted_log_t(true, log_str + e.what());
+                    d = std::numeric_limits<double>::lowest();
+
+                    valid_op(source_collapsed, target_collapsed) = false;
+                    valid_op(target_collapsed, source_collapsed) = false;
+                    delta(source_collapsed, target_collapsed) = d;
+                    delta(target_collapsed, source_collapsed) = d;
+
+                    util::formatted_log_t(true, log_str + "valid_op and delta updated");
+                }
+
                 parents.pop_back();
                 // TODO: Is necessary parents_source.push_back(target_node);?
                 delta(source_collapsed, target_collapsed) = d;
@@ -446,8 +463,8 @@ void ArcOperatorSet::update_incoming_arcs_scores(const BayesianNetworkBase& mode
             }
         }
     }
+    util::formatted_log_t(true, log_str + "FINISHED");
 }
-// TODO: HERE IT FAILS
 void ArcOperatorSet::update_scores(const BayesianNetworkBase& model,
                                    const Score& score,
                                    const std::vector<std::string>& variables) {
@@ -464,6 +481,7 @@ void ArcOperatorSet::update_scores(const BayesianNetworkBase& model,
     for (const auto& n : variables) {
         update_incoming_arcs_scores(model, score, n);
     }
+    util::formatted_log_t(true, log_str + "update_incoming_arcs_scores Calculated");
 }
 
 // TODO: Update singular covariance?
@@ -667,8 +685,11 @@ std::shared_ptr<Operator> ChangeNodeTypeSet::find_max(const BayesianNetworkBase&
 void ChangeNodeTypeSet::update_scores(const BayesianNetworkBase& model,
                                       const Score& score,
                                       const std::vector<std::string>& variables) {
+    // TODO: Problema con singular covariance salta en esta función -> Se ha hecho apaño para que no salte, pero hay que
+    // pensarlo mejor
+    std::string log_str = "ChangeNodeTypeSet::update_scores:\t";
     raise_uninitialized();
-
+    util::formatted_log_t(true, log_str + "m_local_cache->update_local_score TBC");
     if (owns_local_cache()) {
         for (const auto& n : variables) {
             m_local_cache->update_local_score(model, score, n);
@@ -679,7 +700,7 @@ void ChangeNodeTypeSet::update_scores(const BayesianNetworkBase& model,
     for (const auto& n : variables) {
         auto collapsed_index = model.collapsed_index(n);
 
-        if (m_is_whitelisted(collapsed_index)) continue;
+        if (m_is_whitelisted(collapsed_index)) continue;  // If the node is whitelisted, continue to the next node.
 
         double current_score = this->m_local_cache->local_score(model, n);
         auto alt_node_types = model.type()->alternative_node_type(model, n);
@@ -697,10 +718,16 @@ void ChangeNodeTypeSet::update_scores(const BayesianNetworkBase& model,
         for (auto k = 0, k_end = static_cast<int>(alt_node_types.size()); k < k_end; ++k) {
             bool not_blacklisted =
                 m_type_blacklist.find(std::make_pair(n, alt_node_types[k])) == m_type_blacklist.end();
-
             if (bn_type->compatible_node_type(model, n, alt_node_types[k]) && not_blacklisted) {
                 auto parents = model.parents(n);
-                delta[collapsed_index](k) = score.local_score(model, alt_node_types[k], n, parents) - current_score;
+                try {  // NOTE: In case singular covariance data is found after node change, the operation is marked as
+                       // invalid
+                    delta[collapsed_index](k) = score.local_score(model, alt_node_types[k], n, parents) - current_score;
+                } catch (const util::singular_covariance_data& e) {
+                    util::formatted_log_t(true, log_str + e.what());
+                    delta[collapsed_index](k) = std::numeric_limits<double>::lowest();
+                    util::formatted_log_t(true, log_str + n + "node delta corrected");
+                }
             } else {
                 delta[collapsed_index](k) = std::numeric_limits<double>::lowest();
             }

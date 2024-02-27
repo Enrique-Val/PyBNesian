@@ -150,14 +150,14 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
 
         spinner->update_status("Caching scores...");
 
-        // TODO: Here the score of each node is calculated (log-likelihood fit?)
-        // TODO: Peta si hay variables sueltas con varianza 0 -> Arreglar
+        // NOTE: Here the score of each node is calculated (log-likelihood fit)
         // (cv_likelihood.cpp: 31) Partiendo de que se empieza con los nodos sin padres, se calcula el score
         // independiente, y da que no es 0 Opciones:
         // 1. Se calcula el score independiente, y tras fallar el fit de log-likelihood se hace regularización?
         // 2. Se elimina la variable?
         // 3. Hacer try-catch para que cuando de error, se añada regularización al score
 
+        // TODO: Peta si hay variables sueltas con varianza 0 al hacer cross-validation -> Arreglar?
         // Initializes the local validation scores for the current model
         util::formatted_log_t(verbose, log_str + "Local Validation TBC");
         LocalScoreCache local_validation = [&]() {                 // Local validation scores (lambda expression)
@@ -191,7 +191,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             // Finds the best operator
             // HC Algorithm lines 8 -> 16 [Atienza et al. (2022)]
             // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
-            // TODO: Here the best operators are evaluated (log-likelihood fit?)
+            // NOTE: Here the best operators are evaluated (log-likelihood fit)
             util::formatted_log_t(verbose, log_str + "Best operator TBC");
             auto best_op = [&]() {
                 if constexpr (zero_patience)
@@ -207,7 +207,6 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             // If the best operator is nullptr or the delta is less than epsilon, then the search process fails and
             // stops
 
-            // TODO: Teóricamente, de aquí en adelante, no debería petar más el modelo...
             // S_validation puede pasar try { Algorithm lines 17 -> 24 [Atienza et al. (2022)] Applies the best operator
             // to the current model
             best_op->apply(*current_model);
@@ -256,7 +255,9 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             best_op->apply(*prev_current_model);
 
             if (callback) callback->call(*current_model, best_op.get(), score, iter);
+
             util::formatted_log_t(verbose, log_str + "Updating scores");
+            // NOTE: Here the scores node are reevaluated (log-likelihood fit)
             op_set.update_scores(*current_model, score, nodes_changed);
             util::formatted_log_t(verbose, log_str + "Scores updated");
             if constexpr (std::is_base_of_v<ValidatedScore, S>) {
