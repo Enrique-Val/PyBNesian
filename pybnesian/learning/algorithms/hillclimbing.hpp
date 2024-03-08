@@ -176,7 +176,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
         // Cache scores
         util::formatted_log_t(verbose, log_str + "op_set.cache_scores TBC");
         // Caches the delta score values of each operator in the set.
-        op_set.cache_scores(*current_model, score);
+        op_set.cache_scores(*current_model, score, verbose);
         int p = 0;
         double accumulated_offset = 0;
 
@@ -190,7 +190,6 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
             ++iter;
             // Finds the best operator
             // HC Algorithm lines 8 -> 16 [Atienza et al. (2022)]
-            // TODO: I don't understand how the best_op is iterated and evaluated -> Check with verbose=True and prints
             // NOTE: Here the best operators are evaluated (log-likelihood fit)
             util::formatted_log_t(verbose, log_str + "Best operator TBC");
             auto best_op = [&]() {
@@ -258,7 +257,7 @@ std::shared_ptr<T> estimate_hc(OperatorSet& op_set,
 
             util::formatted_log_t(verbose, log_str + "Updating scores");
             // NOTE: Here the scores node are reevaluated (log-likelihood fit)
-            op_set.update_scores(*current_model, score, nodes_changed);
+            op_set.update_scores(*current_model, score, nodes_changed, verbose);
             util::formatted_log_t(verbose, log_str + "Scores updated");
             if constexpr (std::is_base_of_v<ValidatedScore, S>) {
                 spinner->update_status(best_op->ToString() +

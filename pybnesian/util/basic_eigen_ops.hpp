@@ -143,7 +143,7 @@ Matrix<typename M::Scalar, Dynamic, Dynamic> sqrt_matrix(const M& m) {
  * @return false If M is not positive definite.
  */
 template <typename M>
-bool is_psd(const M& m) {
+bool is_psd(const M& m, int verbose = 1) {  // NOTE: alwats verbose
     using MatrixType = Matrix<typename M::Scalar, Dynamic, Dynamic>;
 
     Eigen::LLT<MatrixType> lltOfM(m);  // compute the Cholesky decomposition of m
@@ -153,7 +153,7 @@ bool is_psd(const M& m) {
            << "C++ Matrix m:\n"
            << m << "\nCHOLESKY: Possibly non semi-positive definite matrix!";
         std::string log_str = ss.str();
-        util::formatted_log_t(true, log_str);
+        util::formatted_log_t(verbose, log_str);
         return false;
     } else {
         return true;
