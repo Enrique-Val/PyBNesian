@@ -11,7 +11,7 @@ from setuptools.command.build_ext import build_ext
 
 import find_opencl
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 if sys.platform == "darwin":
     darwin_opts = ["-stdlib=libc++", "-mmacosx-version-min=10.14"]
