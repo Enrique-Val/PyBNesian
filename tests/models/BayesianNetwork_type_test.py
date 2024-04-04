@@ -1,15 +1,7 @@
 import pybnesian as pbn
+from pybnesian import BayesianNetworkType, BayesianNetwork, ConditionalBayesianNetwork, GaussianNetwork,\
+    SemiparametricBN, KDENetwork, DiscreteBN
 import util_test
-from pybnesian import (
-    BayesianNetwork,
-    BayesianNetworkType,
-    ConditionalBayesianNetwork,
-    DiscreteBN,
-    GaussianNetwork,
-    KDENetwork,
-    SemiparametricBN,
-)
-
 
 def test_bn_type():
     g1 = GaussianNetwork(["a", "b", "c", "d"])
@@ -55,7 +47,6 @@ def test_bn_type():
     assert s1.type() != d1.type()
     assert k1.type() != d1.type()
 
-
 def test_new_bn_type():
     class MyGaussianNetworkType(BayesianNetworkType):
         def __init__(self):
@@ -78,7 +69,7 @@ def test_new_bn_type():
     class MySemiparametricBNType(BayesianNetworkType):
         def __init__(self):
             BayesianNetworkType.__init__(self)
-
+    
     b1 = MySemiparametricBNType()
     b2 = MySemiparametricBNType()
     b3 = MySemiparametricBNType()
@@ -113,28 +104,19 @@ class MyRestrictedGaussianNetworkType(BayesianNetworkType):
     def __str__(self):
         return "MyRestrictedGaussianNetworkType"
 
-
 class SpecificNetwork(BayesianNetwork):
     def __init__(self, variables, arcs=None):
         if arcs is None:
             BayesianNetwork.__init__(self, MyRestrictedGaussianNetworkType(), variables)
         else:
-            BayesianNetwork.__init__(
-                self, MyRestrictedGaussianNetworkType(), variables, arcs
-            )
-
+            BayesianNetwork.__init__(self, MyRestrictedGaussianNetworkType(), variables, arcs)
 
 class ConditionalSpecificNetwork(ConditionalBayesianNetwork):
     def __init__(self, variables, interface, arcs=None):
         if arcs is None:
-            ConditionalBayesianNetwork.__init__(
-                self, MyRestrictedGaussianNetworkType(), variables, interface
-            )
+            ConditionalBayesianNetwork.__init__(self, MyRestrictedGaussianNetworkType(), variables, interface)
         else:
-            ConditionalBayesianNetwork.__init__(
-                self, MyRestrictedGaussianNetworkType(), variables, interface, arcs
-            )
-
+            ConditionalBayesianNetwork.__init__(self, MyRestrictedGaussianNetworkType(), variables, interface, arcs)
 
 def test_new_specific_bn_type():
     sp1 = SpecificNetwork(["a", "b", "c", "d"])
@@ -165,7 +147,7 @@ def test_new_specific_bn_type():
     # #######################
     # Conditional BN
     # #######################
-
+ 
     csp1 = ConditionalSpecificNetwork(["a", "b"], ["c", "d"])
     csp2 = ConditionalSpecificNetwork(["a", "b"], ["c", "d"], [("a", "b")])
     csp3 = ConditionalSpecificNetwork(["a", "b"], ["c", "d"])

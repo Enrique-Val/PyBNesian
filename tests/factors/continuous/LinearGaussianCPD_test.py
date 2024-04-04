@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 import pyarrow as pa
-import util_test
+import pybnesian as pbn
+
+import pytest
 from scipy.stats import norm
 
-import pybnesian as pbn
+import util_test
 
 SIZE = 10000
 

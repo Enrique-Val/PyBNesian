@@ -165,23 +165,7 @@ void ProductKDE::_fit(const DataFrame& df) {
 
     auto& opencl = OpenCLConfig::get();
 
-    // NOTE: Here the positive definiteness of the bandwidth is checked
-    try {
-        m_bandwidth = m_bselector->diag_bandwidth(df, m_variables);
-    } catch (util::singular_covariance_data& e) {
-        std::cerr << e.what() << std::endl;
-
-        // TODO: This doesn't work when the matrix has exactly the same value in all the elements
-        // TODO if bandwidth is not positive definite, try to add a small value to the diagonal?
-        // m_bandwidth = m_bandwidth + VectorXd::Constant(m_variables.size(), 1e-6);
-        // std::cout << "The bandwidth matrix is not positive definite. Adding a small value to the vector." <<
-        // std::endl;
-        throw e;
-    }
-
-    // TODO if bandwidth is not positive definite? e.g., In this case if an eigenvalue is 0
-    // - try to add a small value to the diagonal?
-    // - Add to blacklist and ignore this iteration?
+    m_bandwidth = m_bselector->diag_bandwidth(df, m_variables);
 
     for (size_t i = 0; i < m_variables.size(); ++i) {
         if constexpr (std::is_same_v<CType, double>) {
