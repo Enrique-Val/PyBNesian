@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.4 
+
+- Fixed inference in discrete network, sampling from the accumulated using a real number between 0 and 1 rather than just choosing either 0 or 1.
+
+- Added additional functionality to discrete factor to obtain its domain and the probability of each value.
+
 ## v0.4.3
 
 - Fixed a bug in `DiscreteFactor` and others hybrid factors, such as `CLinearGaussianCPD` and `HCKDE`, where categorical data would not be correctly validated. This could lead to erroneous results or undefined behavior (often leading to segmentation fault). Thanks to Carlos Li for reporting this bug.

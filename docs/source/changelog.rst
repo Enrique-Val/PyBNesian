@@ -2,6 +2,14 @@
 Changelog
 *********
 
+v0.4.4
+======
+
+- Fixed inference in discrete network, sampling from the accumulated using a real number between 0 and 1 rather than just choosing either 0 or 1.
+
+- Added additional functionality to discrete factor to obtain its domain and the probability of each value.
+
+
 v0.4.3
 ======
 
