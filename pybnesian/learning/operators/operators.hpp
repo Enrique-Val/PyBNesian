@@ -292,26 +292,43 @@ private:
     SetType m_set;
 };
 
+/**
+ * @brief Cache of local scores for each node in the network.
+ *
+ */
 class LocalScoreCache {
 public:
     LocalScoreCache() : m_local_score() {}
     LocalScoreCache(const BayesianNetworkBase& m) : m_local_score(m.num_nodes()) {}
 
+    /**
+     * @brief Cache local scores for each node in the network.
+     *
+     * @param model Bayesian network
+     * @param score Score
+     */
     void cache_local_scores(const BayesianNetworkBase& model, const Score& score) {
+        // Checks if the cache has the right size
         if (m_local_score.rows() != model.num_nodes()) {
             m_local_score = VectorXd(model.num_nodes());
         }
-
+        // Caches the local score for each node
         for (const auto& node : model.nodes()) {
             m_local_score(model.collapsed_index(node)) = score.local_score(model, node);
         }
     }
-
+    /**
+     * @brief Cache Validated local scores for each node in the network.
+     *
+     * @param model Bayesian network
+     * @param score Validated score
+     */
     void cache_vlocal_scores(const BayesianNetworkBase& model, const ValidatedScore& score) {
+        // Checks if the cache has the right size
         if (m_local_score.rows() != model.num_nodes()) {
             m_local_score = VectorXd(model.num_nodes());
         }
-
+        // Caches the validated local score for each node
         for (const auto& node : model.nodes()) {
             m_local_score(model.collapsed_index(node)) = score.vlocal_score(model, node);
         }
@@ -342,17 +359,21 @@ public:
     OperatorSet() : m_local_cache(nullptr), m_owns_local_cache(false) {}
     virtual ~OperatorSet() {}
     virtual bool is_python_derived() const { return false; }
-    virtual void cache_scores(const BayesianNetworkBase&, const Score&) = 0;
+    virtual void cache_scores(const BayesianNetworkBase&, const Score&, int verbose = 0) = 0;
     virtual std::shared_ptr<Operator> find_max(const BayesianNetworkBase&) const = 0;
     virtual std::shared_ptr<Operator> find_max(const BayesianNetworkBase&, const OperatorTabuSet&) const = 0;
-    virtual void update_scores(const BayesianNetworkBase&, const Score&, const std::vector<std::string>&) = 0;
+    virtual void update_scores(const BayesianNetworkBase&,
+                               const Score&,
+                               const std::vector<std::string>&,
+                               int verbose = 0) = 0;
 
-    virtual void cache_scores(const ConditionalBayesianNetworkBase&, const Score&) = 0;
+    virtual void cache_scores(const ConditionalBayesianNetworkBase&, const Score&, int verbose = 0) = 0;
     virtual std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase&) const = 0;
     virtual std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase&, const OperatorTabuSet&) const = 0;
     virtual void update_scores(const ConditionalBayesianNetworkBase&,
                                const Score&,
-                               const std::vector<std::string>&) = 0;
+                               const std::vector<std::string>&,
+                               int verbose = 0) = 0;
 
     void set_local_score_cache(std::shared_ptr<LocalScoreCache> score_cache) {
         m_local_cache = score_cache;
@@ -439,7 +460,7 @@ public:
                    int indegree = 0)
         : delta(), valid_op(), sorted_idx(), m_blacklist(blacklist), m_whitelist(whitelist), max_indegree(indegree) {}
 
-    void cache_scores(const BayesianNetworkBase& model, const Score& score) override;
+    void cache_scores(const BayesianNetworkBase& model, const Score& score, int verbose = 0) override;
     std::shared_ptr<Operator> find_max(const BayesianNetworkBase& model) const override;
     std::shared_ptr<Operator> find_max(const BayesianNetworkBase& model,
                                        const OperatorTabuSet& tabu_set) const override;
@@ -448,9 +469,12 @@ public:
     template <bool limited_indigree>
     std::shared_ptr<Operator> find_max_indegree(const BayesianNetworkBase& model,
                                                 const OperatorTabuSet& tabu_set) const;
-    void update_scores(const BayesianNetworkBase&, const Score&, const std::vector<std::string>&) override;
+    void update_scores(const BayesianNetworkBase&,
+                       const Score&,
+                       const std::vector<std::string>&,
+                       int verbose = 0) override;
 
-    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score) override;
+    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score, int verbose = 0) override;
     std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase& model) const override;
     std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase& model,
                                        const OperatorTabuSet& tabu_set) const override;
@@ -459,14 +483,19 @@ public:
     template <bool limited_indigree>
     std::shared_ptr<Operator> find_max_indegree(const ConditionalBayesianNetworkBase& model,
                                                 const OperatorTabuSet& tabu_set) const;
-    void update_scores(const ConditionalBayesianNetworkBase&, const Score&, const std::vector<std::string>&) override;
+    void update_scores(const ConditionalBayesianNetworkBase&,
+                       const Score&,
+                       const std::vector<std::string>&,
+                       int verbose = 0) override;
 
     void update_incoming_arcs_scores(const BayesianNetworkBase& model,
                                      const Score& score,
-                                     const std::string& target_node);
+                                     const std::string& target_node,
+                                     int verbose = 0);
     void update_incoming_arcs_scores(const ConditionalBayesianNetworkBase& model,
                                      const Score& score,
-                                     const std::string& target_node);
+                                     const std::string& target_node,
+                                     int verbose = 0);
 
     void update_valid_ops(const BayesianNetworkBase& bn);
     void update_valid_ops(const ConditionalBayesianNetworkBase& bn);
@@ -485,7 +514,7 @@ private:
     ArcStringVector m_whitelist;
     int max_indegree;
 };
-
+// TODO CHECK HOW BEST OP IS FOUND
 template <bool limited_indegree>
 std::shared_ptr<Operator> ArcOperatorSet::find_max_indegree(const BayesianNetworkBase& model) const {
     auto delta_ptr = delta.data();
@@ -695,16 +724,17 @@ public:
         }
     }
 
-    void cache_scores(const BayesianNetworkBase& model, const Score& score) override;
+    void cache_scores(const BayesianNetworkBase& model, const Score& score, int verbose = 0) override;
     std::shared_ptr<Operator> find_max(const BayesianNetworkBase& model) const override;
     std::shared_ptr<Operator> find_max(const BayesianNetworkBase& model,
                                        const OperatorTabuSet& tabu_set) const override;
     void update_scores(const BayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& variables) override;
+                       const std::vector<std::string>& variables,
+                       int verbose = 0) override;
 
-    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score) override {
-        cache_scores(static_cast<const BayesianNetworkBase&>(model), score);
+    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score, int verbose = 0) override {
+        cache_scores(static_cast<const BayesianNetworkBase&>(model), score, verbose);
     }
     std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase& model) const override {
         return find_max(static_cast<const BayesianNetworkBase&>(model));
@@ -715,8 +745,9 @@ public:
     }
     void update_scores(const ConditionalBayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& variables) override {
-        update_scores(static_cast<const BayesianNetworkBase&>(model), score, variables);
+                       const std::vector<std::string>& variables,
+                       int verbose = 0) override {
+        update_scores(static_cast<const BayesianNetworkBase&>(model), score, variables, verbose);
     }
 
     void update_whitelisted(const BayesianNetworkBase& model) {
@@ -756,8 +787,8 @@ public:
         }
     }
 
-    void cache_scores(const BayesianNetworkBase& model, const Score& score) override {
-        cache_scores<BayesianNetworkBase>(model, score);
+    void cache_scores(const BayesianNetworkBase& model, const Score& score, int verbose = 0) override {
+        cache_scores<BayesianNetworkBase>(model, score, verbose);
     }
     std::shared_ptr<Operator> find_max(const BayesianNetworkBase& model) const override {
         return find_max<BayesianNetworkBase>(model);
@@ -768,12 +799,13 @@ public:
     }
     void update_scores(const BayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& variables) override {
-        update_scores<>(model, score, variables);
+                       const std::vector<std::string>& variables,
+                       int verbose = 0) override {
+        update_scores<>(model, score, variables, verbose);
     }
 
-    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score) override {
-        cache_scores<ConditionalBayesianNetworkBase>(model, score);
+    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score, int verbose = 0) override {
+        cache_scores<ConditionalBayesianNetworkBase>(model, score, verbose);
     }
     std::shared_ptr<Operator> find_max(const ConditionalBayesianNetworkBase& model) const override {
         return find_max<ConditionalBayesianNetworkBase>(model);
@@ -784,18 +816,19 @@ public:
     }
     void update_scores(const ConditionalBayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& variables) override {
-        update_scores<>(model, score, variables);
+                       const std::vector<std::string>& variables,
+                       int verbose = 0) override {
+        update_scores<>(model, score, variables, verbose);
     }
 
     template <typename M>
-    void cache_scores(const M& model, const Score& score);
+    void cache_scores(const M& model, const Score& score, int verbose = 0);
     template <typename M>
     std::shared_ptr<Operator> find_max(const M& model) const;
     template <typename M>
     std::shared_ptr<Operator> find_max(const M& model, const OperatorTabuSet& tabu_set) const;
     template <typename M>
-    void update_scores(const M& model, const Score& score, const std::vector<std::string>& variables);
+    void update_scores(const M& model, const Score& score, const std::vector<std::string>& variables, int verbose = 0);
 
     void set_arc_blacklist(const ArcStringVector& blacklist) override {
         for (auto& opset : m_op_sets) {
@@ -833,8 +866,15 @@ private:
     std::vector<std::shared_ptr<OperatorSet>> m_op_sets;
 };
 
+/**
+ * @brief Cache local scores for each of the operators in the pool with the given model and score.
+ *
+ * @tparam M Model type
+ * @param model Bayesian network
+ * @param score Score
+ */
 template <typename M>
-void OperatorPool::cache_scores(const M& model, const Score& score) {
+void OperatorPool::cache_scores(const M& model, const Score& score, int verbose) {
     if (!this->m_local_cache) {
         initialize_local_cache(model);
 
@@ -846,7 +886,7 @@ void OperatorPool::cache_scores(const M& model, const Score& score) {
     m_local_cache->cache_local_scores(model, score);
 
     for (auto& op_set : m_op_sets) {
-        op_set->cache_scores(model, score);
+        op_set->cache_scores(model, score, verbose);
     }
 }
 
@@ -889,7 +929,10 @@ std::shared_ptr<Operator> OperatorPool::find_max(const M& model, const OperatorT
 }
 
 template <typename M>
-void OperatorPool::update_scores(const M& model, const Score& score, const std::vector<std::string>& variables) {
+void OperatorPool::update_scores(const M& model,
+                                 const Score& score,
+                                 const std::vector<std::string>& variables,
+                                 int verbose) {
     raise_uninitialized();
 
     if (owns_local_cache()) {
@@ -899,7 +942,7 @@ void OperatorPool::update_scores(const M& model, const Score& score, const std::
     }
 
     for (auto& op_set : m_op_sets) {
-        op_set->update_scores(model, score, variables);
+        op_set->update_scores(model, score, variables, verbose);
     }
 }
 
