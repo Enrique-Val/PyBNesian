@@ -267,7 +267,7 @@ public:
 
     bool is_python_derived() const override { return true; }
 
-    void cache_scores(const BayesianNetworkBase& model, const Score& score) override {
+    void cache_scores(const BayesianNetworkBase& model, const Score& score, int verbose) override {
         pybind11::gil_scoped_acquire gil;
         pybind11::function override = pybind11::get_override(static_cast<const OperatorSet*>(this), "cache_scores");
 
@@ -286,7 +286,7 @@ public:
         }
     }
 
-    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score) override {
+    void cache_scores(const ConditionalBayesianNetworkBase& model, const Score& score, int verbose) override {
         pybind11::gil_scoped_acquire gil;
         pybind11::function override = pybind11::get_override(static_cast<const OperatorSet*>(this), "cache_scores");
 
@@ -448,7 +448,8 @@ public:
 
     void update_scores(const BayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& changed_nodes) override {
+                       const std::vector<std::string>& changed_nodes,
+                       int verbose) override {
         if (m_calculate_local_score) raise_uninitialized();
 
         pybind11::gil_scoped_acquire gil;
@@ -463,7 +464,8 @@ public:
 
     void update_scores(const ConditionalBayesianNetworkBase& model,
                        const Score& score,
-                       const std::vector<std::string>& changed_nodes) override {
+                       const std::vector<std::string>& changed_nodes,
+                       int verbose) override {
         if (m_calculate_local_score) raise_uninitialized();
 
         pybind11::gil_scoped_acquire gil;
@@ -751,9 +753,12 @@ Returns the current :class:`LocalScoreCache` of this :class:`OperatorSet`.
 )doc")
         .def(
             "cache_scores",
-            [](OperatorSet& self, BayesianNetworkBase& model, Score& score) { self.cache_scores(model, score); },
+            [](OperatorSet& self, BayesianNetworkBase& model, Score& score, int verbose) {
+                self.cache_scores(model, score, verbose);
+            },
             py::arg("model"),
             py::arg("score"),
+            py::arg("verbose") = 0,
             R"doc(
 Caches the delta score values of each operator in the set.
 
@@ -797,10 +802,12 @@ This method must not return an operator in the ``tabu_set`` in addition to the r
             [](OperatorSet& self,
                const BayesianNetworkBase& model,
                const Score& score,
-               const std::vector<std::string>& variables) { self.update_scores(model, score, variables); },
+               const std::vector<std::string>& variables,
+               int verbose) { self.update_scores(model, score, variables, verbose); },
             py::arg("model"),
             py::arg("score"),
             py::arg("changed_nodes"),
+            py::arg("verbose") = 0,
             R"doc(
 Updates the delta score values of the operators in the set after applying an operator in the ``model``.
 ``changed_nodes`` determines the nodes whose local score has changed after applying the operator.

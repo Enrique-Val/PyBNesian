@@ -1,10 +1,23 @@
-import pytest
-import pyarrow as pa
-import pybnesian as pbn
-from pybnesian import BayesianNetworkType, BayesianNetwork, ConditionalBayesianNetwork, GaussianNetwork,\
-    SemiparametricBN, KDENetwork, DiscreteBN, LinearGaussianCPD, CKDE, DiscreteFactor
 import pickle
+
+import pyarrow as pa
+import pytest
+
+import pybnesian as pbn
 import util_test
+from pybnesian import (
+    CKDE,
+    BayesianNetwork,
+    BayesianNetworkType,
+    ConditionalBayesianNetwork,
+    DiscreteBN,
+    DiscreteFactor,
+    GaussianNetwork,
+    KDENetwork,
+    LinearGaussianCPD,
+    SemiparametricBN,
+)
+
 
 @pytest.fixture
 def gaussian_bytes():
