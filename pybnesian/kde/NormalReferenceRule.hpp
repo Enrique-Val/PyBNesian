@@ -118,7 +118,7 @@ private:
         }
         // The covariance diagonal is used to calculate the bandwidth
         auto diag = cov.diagonal();
-        auto delta = (cov.array().colwise() * diag.cwiseInverse().array()).matrix();
+        auto delta = (cov.array().colwise() * diag.cwiseInverse().array()).matrix();  // diag(cov)^ (-1) * cov
         auto delta_inv = delta.inverse();
 
         auto N = static_cast<CType>(df.valid_rows(variables));
@@ -126,14 +126,16 @@ private:
 
         auto delta_inv_trace = delta_inv.trace();
 
-        // Estimate bandwidth using Equation (3.4) of Chacon and Duong (2018)
+        // NOTE: Estimate bandwidth using Equation (3.4) of Chacon and Duong (2018)
+        // [4*d*sqrt(det(delta))] /
+        // / [(2*trace(delta^(-1)*delta^(-1)) + trace(delta^(-1))^2) * N]
         auto k = 4 * d * std::sqrt(delta.determinant()) /
-                 (2 * (delta_inv * delta_inv).trace() + delta_inv_trace * delta_inv_trace);
-
+                 ((2 * (delta_inv * delta_inv).trace() + delta_inv_trace * delta_inv_trace) * N);
+        auto k2 = std::pow(k, 2. / (d + 4.));
         if constexpr (std::is_same_v<ArrowType, arrow::DoubleType>) {
-            return std::pow(k / N, 2. / (d + 4.)) * diag;
+            return k2 * diag;
         } else {
-            return (std::pow(k / N, 2. / (d + 4.)) * diag).template cast<double>();
+            return (k2 * diag).template cast<double>();
         }
     }
     /**
