@@ -9,22 +9,13 @@ namespace kde {
 
 class NormalReferenceRule : public BandwidthSelector {
 public:
-    /**
-     * @brief Public function for calculating the diagonal bandwidth matrix using the Normal Reference Rule given the
-     * data and variables.
-     *
-     * @param df Dataframe.
-     * @param variables Variables.
-     * @return VectorXd Diagonal bandwidth vector.
-     */
     VectorXd diag_bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const override {
         if (variables.empty()) return VectorXd(0);
 
         size_t valid_rows = df.valid_rows(variables);
-        if (valid_rows <= variables.size()) {  // If the number of (valid) rows is less than the number of variables
+        if (valid_rows <= variables.size()) {
             std::stringstream ss;
-            ss << "NormalReferenceRule::diag_bandwidth -> Diagonal bandwidth matrix of "
-               << std::to_string(variables.size()) << " variables [" << variables[0];
+            ss << "Diagonal bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -39,28 +30,17 @@ public:
             case Type::FLOAT:
                 return diag_bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument(
-                    "NormalReferenceRule::diag_bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data "
-                    "is expected.");
+                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
         }
     }
-    /**
-     * @brief Public function for calculating the bandwidth matrix using the Normal Reference Rule given the data and
-     * variables.
-     *
-     * @param df Data
-     * @param variables Variables.
-     * @return MatrixXd Bandwidth matrix.
-     */
+
     MatrixXd bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const override {
         if (variables.empty()) return MatrixXd(0, 0);
 
         auto valid_rows = df.valid_rows(variables);
-        if (static_cast<size_t>(valid_rows) <=
-            variables.size()) {  // If the number of (valid) rows is less than the number of variables
+        if (static_cast<size_t>(valid_rows) <= variables.size()) {
             std::stringstream ss;
-            ss << "NormalReferenceRule::bandwidth -> Bandwidth matrix of " << std::to_string(variables.size())
-               << " variables [" << variables[0];
+            ss << "Bandwidth matrix of " << std::to_string(variables.size()) << " variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -70,15 +50,12 @@ public:
         }
 
         switch (df.same_type(variables)->id()) {
-            // Here the bandwidth is calculated using the function defined later in the private section.
             case Type::DOUBLE:
                 return bandwidth<arrow::DoubleType>(df, variables);
             case Type::FLOAT:
                 return bandwidth<arrow::FloatType>(df, variables);
             default:
-                throw std::invalid_argument(
-                    "NormalReferenceRule::bandwidth -> Wrong data type to fit bandwidth. [double] or [float] data is "
-                    "expected.");
+                throw std::invalid_argument("Wrong data type to fit bandwidth. [double] or [float] data is expected.");
         }
     }
 
@@ -91,15 +68,6 @@ public:
     }
 
 private:
-    /**
-     * @brief Private function to calculate the diagonal bandwidth matrix using the Normal Reference Rule given the data
-     * and variables. If the covariance matrix is not positive definite, an exception is thrown.
-     *
-     * @tparam ArrowType Arrow Data type.
-     * @param df Dataframe.
-     * @param variables Variables.
-     * @return VectorXd Diagonal bandwidth vector.
-     */
     template <typename ArrowType>
     VectorXd diag_bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const {
         using CType = typename ArrowType::c_type;
@@ -109,14 +77,14 @@ private:
 
         if (!util::is_psd(cov)) {
             std::stringstream ss;
-            ss << "NormalReferenceRule::diag_bandwidth -> Covariance matrix for variables [" << variables[0];
+            ss << "Covariance matrix for variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
             ss << "] is not positive-definite.";
             throw util::singular_covariance_data(ss.str());
         }
-        // The covariance diagonal is used to calculate the bandwidth
+
         auto diag = cov.diagonal();
         auto delta = (cov.array().colwise() * diag.cwiseInverse().array()).matrix();
         auto delta_inv = delta.inverse();
@@ -136,24 +104,16 @@ private:
             return (std::pow(k / N, 2. / (d + 4.)) * diag).template cast<double>();
         }
     }
-    /**
-     * @brief Private function to calculate the bandwidth matrix using the Normal Reference Rule given the data and
-     * variables. If the covariance matrix is not positive definite, an exception is thrown.
-     *
-     * @tparam ArrowType Arrow Data type.
-     * @param df Dataframe.
-     * @param variables Variables.
-     * @return MatrixXd Bandwidth matrix.
-     */
+
     template <typename ArrowType>
     MatrixXd bandwidth(const DataFrame& df, const std::vector<std::string>& variables) const {
         using CType = typename ArrowType::c_type;
 
         auto cov = df.cov<ArrowType>(variables);
 
-        if (!util::is_psd(*cov)) {  // If the covariance matrix is not positive definite
+        if (!util::is_psd(*cov)) {
             std::stringstream ss;
-            ss << "NormalReferenceRule::bandwidth -> Covariance matrix for variables [" << variables[0];
+            ss << "Covariance matrix for variables [" << variables[0];
             for (size_t i = 1; i < variables.size(); ++i) {
                 ss << ", " << variables[i];
             }
@@ -163,7 +123,7 @@ private:
 
         auto N = static_cast<CType>(df.valid_rows(variables));
         auto d = static_cast<CType>(variables.size());
-        // Normal Reference Rule formula squared for the bandwidth
+
         auto k = std::pow(4. / (N * (d + 2.)), 2. / (d + 4));
 
         if constexpr (std::is_same_v<ArrowType, arrow::DoubleType>) {

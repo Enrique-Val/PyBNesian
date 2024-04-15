@@ -179,12 +179,6 @@ private:
     KDE m_marg;
 };
 
-/**
- * @brief Private function to learn the CKDE parameters given the data.
- *
- * @tparam ArrowType Arrow Data type.
- * @param df Data.
- */
 template <typename ArrowType>
 void CKDE::_fit(const DataFrame& df) {
     m_joint.fit(df);

@@ -13,25 +13,13 @@ using models::GaussianNetworkType, models::KDENetworkType, models::Semiparametri
 
 namespace util {
 
-/**
- * @brief Checks if the given score is valid for the given Bayesian network type e.g., "bic","bge, "cv-lik",
- * "holdout-lik", "validated-lik".
- *
- * @param df
- * @param bn_type
- * @param score
- * @param seed
- * @param num_folds
- * @param test_holdout_ratio
- * @return std::unique_ptr<Score>
- */
 std::unique_ptr<Score> check_valid_score(const DataFrame& df,
                                          const BayesianNetworkType& bn_type,
                                          const std::optional<std::string>& score,
                                          int seed,
                                          int num_folds,
                                          double test_holdout_ratio) {
-    if (score) {  // If score is specified
+    if (score) {
         if (*score == "bic") return std::make_unique<BIC>(df);
         if (*score == "bge") return std::make_unique<BGe>(df);
         if (*score == "cv-lik") return std::make_unique<CVLikelihood>(df, num_folds, seed);
@@ -45,30 +33,17 @@ std::unique_ptr<Score> check_valid_score(const DataFrame& df,
                 "\"bic\" (Bayesian Information Criterion), \"bge\" (Bayesian Gaussian equivalent), "
                 "\"cv-lik\" (Cross-Validated likelihood), \"holdout-l\" (Hold-out likelihood) "
                 " or \"validated-lik\" (Validated likelihood with cross-validation).");
-    } else {  // If score is not specified
+    } else {
         if (bn_type == GaussianNetworkType::get_ref()) {
-            return std::make_unique<BIC>(df);  // Default score for GaussianNetworkType
+            return std::make_unique<BIC>(df);
         } else if (bn_type == SemiparametricBNType::get_ref() || bn_type == KDENetworkType::get_ref()) {
-            return std::make_unique<ValidatedLikelihood>(
-                df, test_holdout_ratio, num_folds, seed);  // Default score for SemiparametricBNType and KDENetworkType
+            return std::make_unique<ValidatedLikelihood>(df, test_holdout_ratio, num_folds, seed);
         } else {
             throw std::invalid_argument("Default score not defined for " + bn_type.ToString() + ".");
         }
     }
 }
 
-/**
- * @brief Checks if the given operators are valid for the given Bayesian network type ["arcs", "node_type"].
- * Otherwise, it returns the default operators for the given Bayesian network type
- *
- * @param bn_type
- * @param operators
- * @param arc_blacklist
- * @param arc_whitelist
- * @param max_indegree
- * @param type_whitelist
- * @return std::shared_ptr<OperatorSet>
- */
 std::shared_ptr<OperatorSet> check_valid_operators(const BayesianNetworkType& bn_type,
                                                    const std::optional<std::vector<std::string>>& operators,
                                                    const ArcStringVector& arc_blacklist,
@@ -77,7 +52,7 @@ std::shared_ptr<OperatorSet> check_valid_operators(const BayesianNetworkType& bn
                                                    const FactorTypeVector& type_whitelist) {
     std::vector<std::shared_ptr<OperatorSet>> res;
 
-    if (operators && !operators->empty()) {  // If operators are specified
+    if (operators && !operators->empty()) {
         for (auto& op : *operators) {
             if (op == "arcs") {
                 res.push_back(std::make_shared<ArcOperatorSet>(arc_blacklist, arc_whitelist, max_indegree));
@@ -96,7 +71,7 @@ std::shared_ptr<OperatorSet> check_valid_operators(const BayesianNetworkType& bn
                                             "\"arcs\" (Changes in arcs; addition, removal and flip) or "
                                             "\"node_type\" (Change of node type)");
         }
-    } else {  // If operators are not specified
+    } else {
         if (bn_type == GaussianNetworkType::get_ref())
             res.push_back(std::make_shared<ArcOperatorSet>(arc_blacklist, arc_whitelist, max_indegree));
         else if (bn_type == SemiparametricBNType::get_ref()) {

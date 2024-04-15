@@ -1,7 +1,6 @@
-import numpy as np
 import pytest
-from scipy.stats import gaussian_kde, norm
-
+import numpy as np
+from scipy.stats import norm, gaussian_kde
 import pybnesian as pbn
 import util_test
 
