@@ -245,15 +245,15 @@ def test_productkde_logl():
         npdata = _df.loc[:, variables].to_numpy()
         # final_scipy_kde = gaussian_kde(npdata.T)
         final_scipy_kde = gaussian_kde(
-            dataset=npdata.T,
+            npdata.T,
             bw_method=lambda s: np.power(4 / (s.d + 2), 1 / (s.d + 4))
             * s.scotts_factor(),
         )
-        # TODO: Redo tests so that only the diagonal is checked
         # TODO this overwriting doesn't seem to work with scipy, we have to find different way to set bandwith matrix
         final_scipy_kde.covariance = np.diag(cpd.bandwidth)
-        # TODO variable can't be set
-        final_scipy_kde.inv_cov = np.diag(1.0 / cpd.bandwidth)
+        final_scipy_kde.inv_cov = np.diag(
+            1.0 / cpd.bandwidth
+        )  # TODO variable can't be set
         final_scipy_kde.log_det = (
             cpd.bandwidth.shape[0] * np.log(2 * np.pi) + np.log(cpd.bandwidth).sum()
         )

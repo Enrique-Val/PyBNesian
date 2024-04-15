@@ -213,15 +213,10 @@ def test_kde_logl():
         scipy_kde = gaussian_kde(
             npdata.T,
             bw_method=lambda s: np.power(4 / (s.d + 2), 1 / (s.d + 4))
-            * s.scotts_factor(),  # Normal Reference Rule
+            * s.scotts_factor(),
         )
-
-        # NOTE
-        # TODO: Add tests to check this
-        # scipy_kde.factor == scipy_kde.covariance_factor()
-        # scipy_kde.covariance == scipy_kde.factor ** 2 * npdata.var()
-        # scipy_kde.inv_cov == 1 / scipy_kde.covariance
         # We check that the bandwidth is the same
+        # TODO understand how scipy_kde.covariance is calculated
         assert np.all(np.isclose(cpd.bandwidth, scipy_kde.covariance))
 
         test_npdata = _test_df.loc[:, variables].to_numpy()
