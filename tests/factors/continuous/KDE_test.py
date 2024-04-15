@@ -206,25 +206,19 @@ def test_kde_logl():
             _df (pd.DataFrame): Training dataset.
             _test_df (pd.DataFrame): Test dataset.
         """
-        npdata = _df.loc[:, variables].to_numpy()
-        cpd = pbn.KDE(
-            variables,
-            # bandwidth_selector=pbn.ScottsBandwidth(),
-            bandwidth_selector=pbn.NormalReferenceRule(),
-        )
+        cpd = pbn.KDE(variables)
         cpd.fit(_df)
 
+        npdata = _df.loc[:, variables].to_numpy()
         scipy_kde = gaussian_kde(
-            dataset=npdata.T,
-            # bw_method="scott",
+            npdata.T,
             bw_method=lambda s: np.power(4 / (s.d + 2), 1 / (s.d + 4))
-            * s.scotts_factor(),  # Normal Reference Rule multiplies Scott's factor and then standard deviation
+            * s.scotts_factor(),  # Normal Reference Rule
         )
 
-        # TODO: Add tests to check this
-        # TODO: Add tests to check "scott" bandwidth selectors
         # NOTE
-        # scipy_kde.factor == scipy_kde.covariance_factor() <-- coefficient (kde.factor) that squared, multiplies the data covariance matrix to obtain the kernel covariance matrix.
+        # TODO: Add tests to check this
+        # scipy_kde.factor == scipy_kde.covariance_factor()
         # scipy_kde.covariance == scipy_kde.factor ** 2 * npdata.var()
         # scipy_kde.inv_cov == 1 / scipy_kde.covariance
         # We check that the bandwidth is the same
